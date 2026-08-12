@@ -3,6 +3,8 @@ import { createPlatforms, createBeers, createEnemies, createClouds } from './lev
 import {
   GRAVITY,
   JUMP_FORCE,
+  DOUBLE_JUMP_FORCE,
+  MAX_JUMPS,
   MOVE_SPEED,
   MAX_FALL_SPEED,
   PLAYER_WIDTH,
@@ -26,6 +28,8 @@ export function createInitialState(): GameState {
       animFrame: 0,
       animTimer: 0,
       isJumping: false,
+      jumpsUsed: 0,
+      jumpKeyHeld: false,
     },
     beers: createBeers(),
     platforms: createPlatforms(),
@@ -57,39 +61,29 @@ export function update(state: GameState, keys: Keys): GameState {
 
   const newState = { ...state, time: state.time + 1 };
 
-  // Update player
   updatePlayer(newState, keys);
-
-  // Update enemies
   updateEnemies(newState);
-
-  // Check collisions
   checkBeerCollisions(newState);
   checkEnemyCollisions(newState);
-
-  // Update particles
   updateParticles(newState);
-
-  // Update camera
   updateCamera(newState);
 
-  // Check win condition
   const allCollected = newState.beers.every(b => b.collected);
   if (allCollected) {
     newState.gameWon = true;
   }
 
-  // Check fall death
   if (newState.player.y > CANVAS_HEIGHT + 100) {
     newState.lives -= 1;
     if (newState.lives <= 0) {
       newState.gameOver = true;
     } else {
-      // Respawn
       newState.player.x = Math.max(0, newState.cameraX + 100);
       newState.player.y = 100;
       newState.player.vx = 0;
       newState.player.vy = 0;
+      newState.player.jumpsUsed = 0;
+      newState.player.jumpKeyHeld = false;
     }
   }
 
@@ -107,21 +101,42 @@ function updatePlayer(state: GameState, keys: Keys) {
     player.vx = MOVE_SPEED;
     player.facingRight = true;
   } else {
-    player.vx *= 0.85; // friction
+    player.vx *= 0.85;
     if (Math.abs(player.vx) < 0.2) player.vx = 0;
   }
 
-  // Jump
-  if ((keys.up || keys.space) && player.onGround) {
-    player.vy = JUMP_FORCE;
-    player.onGround = false;
-    player.isJumping = true;
+  // === JUMP LOGIC (edge-triggered for reliable double jump) ===
+  const jumpKeyDown = keys.up || keys.space;
+
+  if (jumpKeyDown && !player.jumpKeyHeld) {
+    if (player.onGround) {
+      // First jump
+      player.vy = JUMP_FORCE;
+      player.onGround = false;
+      player.isJumping = true;
+      player.jumpsUsed = 1;
+    } else if (player.jumpsUsed < MAX_JUMPS) {
+      // Double jump
+      player.vy = DOUBLE_JUMP_FORCE;
+      player.jumpsUsed += 1;
+
+      // Sparkle particles for double jump
+      for (let i = 0; i < 10; i++) {
+        state.particles.push({
+          x: player.x + player.width / 2,
+          y: player.y + player.height,
+          vx: (Math.random() - 0.5) * 5,
+          vy: Math.random() * 3,
+          life: 25,
+          maxLife: 25,
+          color: '#FFFFFF',
+          size: 3 + Math.random() * 2,
+        });
+      }
+    }
   }
 
-  // Variable jump height - release early for shorter jump
-  if (!(keys.up || keys.space) && player.vy < -4) {
-    player.vy *= 0.85;
-  }
+  player.jumpKeyHeld = jumpKeyDown;
 
   // Gravity
   player.vy += GRAVITY;
@@ -130,13 +145,11 @@ function updatePlayer(state: GameState, keys: Keys) {
   // Move X
   player.x += player.vx;
 
-  // Prevent going left of camera
   if (player.x < state.cameraX) {
     player.x = state.cameraX;
   }
 
   // Platform collision X
-  player.onGround = false;
   for (const platform of state.platforms) {
     if (rectsOverlap(player, platform)) {
       if (player.vx > 0) {
@@ -152,16 +165,16 @@ function updatePlayer(state: GameState, keys: Keys) {
   player.y += player.vy;
 
   // Platform collision Y
+  player.onGround = false;
   for (const platform of state.platforms) {
     if (rectsOverlap(player, platform)) {
       if (player.vy > 0) {
-        // Landing on top
         player.y = platform.y - player.height;
         player.vy = 0;
         player.onGround = true;
         player.isJumping = false;
+        player.jumpsUsed = 0; // reset on landing
       } else if (player.vy < 0) {
-        // Hitting from below
         player.y = platform.y + platform.height;
         player.vy = 0;
       }
@@ -186,17 +199,14 @@ function updateEnemies(state: GameState) {
     enemy.x += enemy.vx;
     enemy.animTimer++;
 
-    // Check platform edges and walls
     let onPlatform = false;
     for (const platform of state.platforms) {
-      // Check if enemy is on this platform
       if (
         enemy.x + enemy.width > platform.x &&
         enemy.x < platform.x + platform.width &&
         Math.abs(enemy.y + enemy.height - platform.y) < 5
       ) {
         onPlatform = true;
-        // Check if approaching edge
         if (enemy.vx < 0 && enemy.x <= platform.x + 5) {
           enemy.vx = Math.abs(enemy.vx);
         } else if (enemy.vx > 0 && enemy.x + enemy.width >= platform.x + platform.width - 5) {
@@ -204,13 +214,11 @@ function updateEnemies(state: GameState) {
         }
       }
 
-      // Wall collision
       if (rectsOverlap(enemy, platform) && platform.type === 'pipe') {
         enemy.vx = -enemy.vx;
       }
     }
 
-    // If not on any platform, reverse
     if (!onPlatform) {
       enemy.vx = -enemy.vx;
       enemy.x += enemy.vx * 5;
@@ -229,7 +237,6 @@ function checkBeerCollisions(state: GameState) {
       beer.collected = true;
       state.score += 100;
 
-      // Spawn celebration particles
       for (let i = 0; i < 12; i++) {
         state.particles.push({
           x: beer.x + beer.width / 2,
@@ -251,14 +258,12 @@ function checkEnemyCollisions(state: GameState) {
     if (!enemy.alive) continue;
 
     if (rectsOverlap(state.player, enemy)) {
-      // Check if player is stomping (falling on top)
       if (state.player.vy > 0 && state.player.y + state.player.height - 10 < enemy.y + enemy.height / 2) {
-        // Stomp!
         enemy.alive = false;
         state.player.vy = JUMP_FORCE * 0.6;
+        state.player.jumpsUsed = 1;
         state.score += 200;
 
-        // Spawn defeat particles
         for (let i = 0; i < 10; i++) {
           state.particles.push({
             x: enemy.x + enemy.width / 2,
@@ -272,16 +277,14 @@ function checkEnemyCollisions(state: GameState) {
           });
         }
       } else {
-        // Player hit by enemy
         state.lives -= 1;
         if (state.lives <= 0) {
           state.gameOver = true;
         } else {
-          // Knockback
           state.player.vy = -8;
           state.player.vx = state.player.x < enemy.x ? -5 : 5;
-          // Brief invulnerability (move away)
           state.player.y -= 20;
+          state.player.jumpsUsed = 1;
         }
       }
     }
