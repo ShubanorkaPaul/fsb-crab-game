@@ -1,7 +1,6 @@
 import { BeerCan, Platform, Enemy, Cloud, Boss } from './types';
 import {
   GROUND_Y,
-  LEVEL_WIDTH,
   PLATFORM_HEIGHT,
   BEER_WIDTH,
   BEER_HEIGHT,
@@ -15,12 +14,9 @@ import {
 export function createPlatforms(): Platform[] {
   const platforms: Platform[] = [];
 
-  // === ZONE 1: WARMUP (0-2000) — mostly continuous ground ===
   platforms.push({ x: 0, y: GROUND_Y, width: 1200, height: 60, type: 'ground' });
-  // Small jumpable gap
   platforms.push({ x: 1320, y: GROUND_Y, width: 800, height: 60, type: 'ground' });
 
-  // === ZONE 2: DIFFICULT (2000-5500) — narrower gaps, more platforms ===
   platforms.push({ x: 2220, y: GROUND_Y, width: 500, height: 60, type: 'ground' });
   platforms.push({ x: 2820, y: GROUND_Y, width: 400, height: 60, type: 'ground' });
   platforms.push({ x: 3320, y: GROUND_Y, width: 600, height: 60, type: 'ground' });
@@ -28,29 +24,22 @@ export function createPlatforms(): Platform[] {
   platforms.push({ x: 4470, y: GROUND_Y, width: 500, height: 60, type: 'ground' });
   platforms.push({ x: 5070, y: GROUND_Y, width: 400, height: 60, type: 'ground' });
 
-  // === ZONE 3: RUN TO BOSS (5500-7000) — mostly ground with some tricky spots ===
   platforms.push({ x: 5570, y: GROUND_Y, width: 700, height: 60, type: 'ground' });
   platforms.push({ x: 6370, y: GROUND_Y, width: 500, height: 60, type: 'ground' });
 
-  // === BOSS ARENA (7000-8000) — solid platform, no gaps ===
   platforms.push({ x: BOSS_ARENA_LEFT - 130, y: GROUND_Y, width: 1130, height: 60, type: 'ground' });
 
-  // === FLOATING PLATFORMS ===
   const floating = [
-    // Zone 1 — easy jumps
     { x: 250, y: 340, w: 120 },
     { x: 450, y: 270, w: 100 },
     { x: 650, y: 320, w: 100 },
     { x: 850, y: 250, w: 120 },
     { x: 1050, y: 320, w: 100 },
-    // Bridge across first gap
     { x: 1220, y: 300, w: 90 },
-    // Zone 2 — challenging
     { x: 1450, y: 280, w: 100 },
     { x: 1650, y: 220, w: 90 },
     { x: 1850, y: 300, w: 100 },
     { x: 2050, y: 250, w: 90 },
-    // Bridges over gaps in zone 2
     { x: 2130, y: 320, w: 90 },
     { x: 2740, y: 320, w: 80 },
     { x: 2380, y: 260, w: 100 },
@@ -70,14 +59,12 @@ export function createPlatforms(): Platform[] {
     { x: 5000, y: 340, w: 60 },
     { x: 5150, y: 250, w: 100 },
     { x: 5350, y: 300, w: 90 },
-    // Zone 3
     { x: 5620, y: 280, w: 100 },
     { x: 5820, y: 220, w: 100 },
     { x: 6020, y: 290, w: 90 },
     { x: 6320, y: 320, w: 80 },
     { x: 6450, y: 250, w: 100 },
     { x: 6700, y: 290, w: 100 },
-    // Boss arena — no platforms, must fight on ground
   ];
 
   for (const p of floating) {
@@ -90,7 +77,6 @@ export function createPlatforms(): Platform[] {
     });
   }
 
-  // === PIPES ===
   const pipes = [
     { x: 550, h: 70 },
     { x: 1100, h: 90 },
@@ -103,7 +89,6 @@ export function createPlatforms(): Platform[] {
     { x: 5300, h: 70 },
     { x: 5900, h: 90 },
     { x: 6500, h: 80 },
-    // Arena entrance — big pipe wall to signify boss zone
     { x: 6920, h: 110 },
   ];
 
@@ -122,7 +107,6 @@ export function createPlatforms(): Platform[] {
 
 export function createBeers(): BeerCan[] {
   const positions = [
-    // Zone 1 — easy
     { x: 200, y: GROUND_Y - BEER_HEIGHT - 5 },
     { x: 280, y: 280 },
     { x: 490, y: 210 },
@@ -130,7 +114,6 @@ export function createBeers(): BeerCan[] {
     { x: 880, y: 190 },
     { x: 1080, y: 260 },
     { x: 1240, y: 240 },
-    // Zone 2 — challenging
     { x: 1480, y: 220 },
     { x: 1680, y: 160 },
     { x: 1880, y: 240 },
@@ -148,13 +131,11 @@ export function createBeers(): BeerCan[] {
     { x: 4810, y: 220 },
     { x: 5180, y: 190 },
     { x: 5380, y: 240 },
-    // Zone 3 — approach to boss
     { x: 5650, y: 220 },
     { x: 5850, y: 160 },
     { x: 6050, y: 230 },
     { x: 6480, y: 190 },
     { x: 6730, y: 230 },
-    // Bonus beer inside boss arena (risky!)
     { x: 7500, y: GROUND_Y - BEER_HEIGHT - 5 },
   ];
 
@@ -172,7 +153,6 @@ export function createBeers(): BeerCan[] {
 export function createEnemies(): Enemy[] {
   const enemies: Enemy[] = [];
 
-  // Helper to create enemy
   const make = (
     x: number,
     y: number,
@@ -184,7 +164,7 @@ export function createEnemies(): Enemy[] {
       rat: { w: 45, h: 35 },
       crow: { w: 50, h: 40 },
       mine: { w: 35, h: 35 },
-      ninja: { w: 40, h: 50 },
+      ninja: { w: 45, h: 60 },
     };
     const s = sizes[type];
     return {
@@ -204,36 +184,38 @@ export function createEnemies(): Enemy[] {
     };
   };
 
-  // Zone 1 (0-2000) — bottles and rats
-  enemies.push(make(400, GROUND_Y, 'bottle', -1.5));
+  // Zone 1 (0-2000) — placed on ground platforms, away from pipes
+  enemies.push(make(300, GROUND_Y, 'bottle', -1.5));
   enemies.push(make(800, GROUND_Y, 'rat', -2));
+  enemies.push(make(1000, GROUND_Y, 'ninja', -1.5));   // cossack #1
   enemies.push(make(1400, GROUND_Y, 'bottle', -1.8));
-  enemies.push(make(700, 250, 'crow', -1.5)); // flying crow
+  enemies.push(make(700, 250, 'crow', -1.5));
 
-  // Zone 2 (2000-5500) — everything
-  enemies.push(make(2300, GROUND_Y, 'rat', -2.2));
-  enemies.push(make(2600, GROUND_Y, 'mine')); // stationary mine
+  // Zone 2 (2000-5500)
+  enemies.push(make(2280, GROUND_Y, 'rat', -2.2));
+  enemies.push(make(2500, GROUND_Y, 'ninja', -2));      // cossack #2
+  enemies.push(make(2650, GROUND_Y, 'mine'));
   enemies.push(make(2900, GROUND_Y, 'bottle', -1.7));
-  enemies.push(make(2400, 220, 'crow', -2)); // crow above
-  enemies.push(make(3300, GROUND_Y, 'ninja', -1)); // jumping ninja
-  enemies.push(make(3500, GROUND_Y, 'mine'));
-  enemies.push(make(3700, GROUND_Y, 'rat', -2.5));
+  enemies.push(make(2400, 220, 'crow', -2));
+  enemies.push(make(3350, GROUND_Y, 'rat', -2.5));
+  enemies.push(make(3600, GROUND_Y, 'mine'));
+  enemies.push(make(3750, GROUND_Y, 'ninja', -2));      // cossack #3
   enemies.push(make(3900, 200, 'crow', -1.8));
   enemies.push(make(4050, GROUND_Y, 'bottle', -1.8));
   enemies.push(make(4300, GROUND_Y, 'mine'));
-  enemies.push(make(4500, GROUND_Y, 'ninja', -1.5));
+  enemies.push(make(4550, GROUND_Y, 'ninja', -2));      // cossack #4
   enemies.push(make(4700, 180, 'crow', -2));
   enemies.push(make(4900, GROUND_Y, 'rat', -2.3));
-  enemies.push(make(5100, GROUND_Y, 'bottle', -2));
-  enemies.push(make(5350, GROUND_Y, 'mine'));
+  enemies.push(make(5150, GROUND_Y, 'bottle', -2));
+  enemies.push(make(5380, GROUND_Y, 'mine'));
 
-  // Zone 3 (5500-7000) — final push
-  enemies.push(make(5700, GROUND_Y, 'ninja', -1.5));
-  enemies.push(make(5900, GROUND_Y, 'rat', -2.5));
+  // Zone 3 (5500-7000)
+  enemies.push(make(5700, GROUND_Y, 'ninja', -2));      // cossack #5
+  enemies.push(make(5950, GROUND_Y, 'rat', -2.5));
   enemies.push(make(5850, 180, 'crow', -2.2));
-  enemies.push(make(6100, GROUND_Y, 'mine'));
+  enemies.push(make(6150, GROUND_Y, 'mine'));
   enemies.push(make(6400, GROUND_Y, 'bottle', -2));
-  enemies.push(make(6600, GROUND_Y, 'ninja', -2));
+  enemies.push(make(6600, GROUND_Y, 'ninja', -2));      // cossack #6
   enemies.push(make(6500, 160, 'crow', -2.5));
   enemies.push(make(6800, GROUND_Y, 'rat', -2.8));
 
@@ -262,15 +244,7 @@ export function createBoss(): Boss {
   };
 }
 
+// Clouds disabled
 export function createClouds(): Cloud[] {
-  const clouds: Cloud[] = [];
-  for (let i = 0; i < 20; i++) {
-    clouds.push({
-      x: Math.random() * LEVEL_WIDTH,
-      y: 30 + Math.random() * 100,
-      width: 60 + Math.random() * 80,
-      speed: 0.2 + Math.random() * 0.3,
-    });
-  }
-  return clouds;
+  return [];
 }
