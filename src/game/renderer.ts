@@ -29,7 +29,6 @@ export function loadImages() {
 export function render(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.save();
 
-  // Non-gameplay screens
   if (state.screen === 'menu') {
     drawMenuScreen(ctx);
     ctx.restore();
@@ -56,10 +55,8 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
     return;
   }
 
-  // Gameplay rendering
   const currentBg = state.currentLevel === 1 ? bgImage1 : bgImage2;
 
-  // Sky/dark backdrop
   ctx.fillStyle = state.currentLevel === 1 ? '#4a90d9' : '#1a0a1e';
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
@@ -72,7 +69,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   } else {
-    // Level 2: dark pub backdrop with red neon glow
     const barGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
     barGrad.addColorStop(0, '#1a0a1e');
     barGrad.addColorStop(0.4, '#2a0e1e');
@@ -80,7 +76,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
     ctx.fillStyle = barGrad;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Pulsing red neon glow at top
     const pulse = 0.7 + 0.3 * Math.sin(state.time * 0.1);
     ctx.fillStyle = `rgba(255, 0, 60, ${0.05 * pulse})`;
     ctx.fillRect(0, 0, CANVAS_WIDTH, 150);
@@ -201,14 +196,12 @@ function drawPlatform(ctx: CanvasRenderingContext2D, p: Platform, level: number)
         ctx.fillRect(gx + 6, p.y - 1, 2, 4);
       }
     } else {
-      // Level 2: wooden bar floor
       const floorGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.height);
       floorGrad.addColorStop(0, '#5D3A1A');
       floorGrad.addColorStop(0.1, '#4A2E15');
       floorGrad.addColorStop(1, '#2A1A08');
       ctx.fillStyle = floorGrad;
       ctx.fillRect(p.x, p.y, p.width, p.height);
-      // Wooden planks
       ctx.strokeStyle = 'rgba(0,0,0,0.4)';
       ctx.lineWidth = 1;
       for (let gx = p.x; gx < p.x + p.width; gx += 40) {
@@ -248,7 +241,6 @@ function drawPlatform(ctx: CanvasRenderingContext2D, p: Platform, level: number)
       ctx.fillStyle = 'rgba(255,255,255,0.15)';
       ctx.fillRect(p.x + 5, p.y + 15, 8, p.height - 15);
     } else {
-      // Level 2: beer tap — metallic with "13R" plaque
       const tapGrad = ctx.createLinearGradient(p.x, p.y, p.x + p.width, p.y);
       tapGrad.addColorStop(0, '#455A64');
       tapGrad.addColorStop(0.3, '#78909C');
@@ -256,12 +248,10 @@ function drawPlatform(ctx: CanvasRenderingContext2D, p: Platform, level: number)
       tapGrad.addColorStop(1, '#37474F');
       ctx.fillStyle = tapGrad;
       ctx.fillRect(p.x, p.y, p.width, p.height);
-      // Handle on top
       ctx.fillStyle = '#B71C1C';
       ctx.fillRect(p.x - 8, p.y - 12, p.width + 16, 12);
       ctx.fillStyle = '#000';
       ctx.fillRect(p.x - 8, p.y - 12, p.width + 16, 3);
-      // Plaque "13R"
       ctx.fillStyle = '#FFD700';
       ctx.fillRect(p.x + 8, p.y + 20, p.width - 16, 15);
       ctx.fillStyle = '#000';
@@ -269,37 +259,30 @@ function drawPlatform(ctx: CanvasRenderingContext2D, p: Platform, level: number)
       ctx.textAlign = 'center';
       ctx.fillText('13R', p.x + p.width / 2, p.y + 31);
       ctx.textAlign = 'left';
-      // Highlight
       ctx.fillStyle = 'rgba(255,255,255,0.25)';
       ctx.fillRect(p.x + 4, p.y + 15, 4, p.height - 20);
     }
   } else if (p.type === 'bar') {
-    // Bar counter — polished wooden platform
     const barGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.height);
     barGrad.addColorStop(0, '#8D6E63');
     barGrad.addColorStop(0.5, '#5D4037');
     barGrad.addColorStop(1, '#3E2723');
     ctx.fillStyle = barGrad;
     ctx.fillRect(p.x, p.y, p.width, p.height);
-    // Glossy highlight
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
     ctx.fillRect(p.x, p.y, p.width, 3);
-    // Bottom edge
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fillRect(p.x, p.y + p.height - 2, p.width, 2);
   } else if (p.type === 'barrel') {
-    // Wooden beer barrel
     const barrelGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.height);
     barrelGrad.addColorStop(0, '#8D6E63');
     barrelGrad.addColorStop(0.5, '#5D4037');
     barrelGrad.addColorStop(1, '#3E2723');
     ctx.fillStyle = barrelGrad;
     ctx.fillRect(p.x, p.y, p.width, p.height);
-    // Metal bands
     ctx.fillStyle = '#9E9E9E';
     ctx.fillRect(p.x, p.y + 2, p.width, 3);
     ctx.fillRect(p.x, p.y + p.height - 5, p.width, 3);
-    // Vertical planks
     ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     ctx.lineWidth = 1;
     for (let bx = p.x + 8; bx < p.x + p.width; bx += 12) {
@@ -308,7 +291,6 @@ function drawPlatform(ctx: CanvasRenderingContext2D, p: Platform, level: number)
       ctx.lineTo(bx, p.y + p.height - 3);
       ctx.stroke();
     }
-    // "13R" label
     ctx.fillStyle = '#FFD700';
     ctx.font = 'bold 8px monospace';
     ctx.textAlign = 'center';
@@ -748,16 +730,11 @@ function drawGeneralBoss(ctx: CanvasRenderingContext2D, boss: Boss) {
   drawStar(ctx, cx, boss.y + 8, 5);
 }
 
-/**
- * TURKMEN ELDER — boss of Level 2 (Bar "13 Rules").
- * Ancient man in long white robe, tall karakul hat, HUGE grey beard.
- */
 function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   const cx = boss.x + boss.width / 2;
   const bodyTop = boss.y + 45;
   const bodyBottom = boss.y + boss.height;
 
-  // Long white/cream robe (халат)
   const robeGrad = ctx.createLinearGradient(boss.x, bodyTop, boss.x, bodyBottom);
   robeGrad.addColorStop(0, '#F5F5DC');
   robeGrad.addColorStop(1, '#D7CCC8');
@@ -770,7 +747,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.closePath();
   ctx.fill();
 
-  // Turkmen ornament on robe (red patterns)
   ctx.fillStyle = '#B71C1C';
   for (let i = 0; i < 4; i++) {
     ctx.beginPath();
@@ -782,13 +758,11 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
     ctx.fill();
   }
 
-  // Green belt (sash)
   ctx.fillStyle = '#1B5E20';
   ctx.fillRect(boss.x + 18, bodyTop + 55, boss.width - 36, 7);
   ctx.fillStyle = '#FFD700';
   ctx.fillRect(cx - 5, bodyTop + 55, 10, 7);
 
-  // Sleeves
   ctx.fillStyle = '#EEEEEE';
   ctx.beginPath();
   ctx.ellipse(boss.x + 12, bodyTop + 35, 12, 22, -0.15, 0, Math.PI * 2);
@@ -797,7 +771,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.ellipse(boss.x + boss.width - 12, bodyTop + 35, 12, 22, 0.15, 0, Math.PI * 2);
   ctx.fill();
 
-  // Hands
   ctx.fillStyle = '#F5D6B3';
   ctx.beginPath();
   ctx.arc(boss.x + 9, bodyTop + 55, 6, 0, Math.PI * 2);
@@ -806,7 +779,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.arc(boss.x + boss.width - 9, bodyTop + 55, 6, 0, Math.PI * 2);
   ctx.fill();
 
-  // Prayer beads in one hand
   ctx.fillStyle = '#795548';
   for (let i = 0; i < 5; i++) {
     ctx.beginPath();
@@ -814,13 +786,11 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
     ctx.fill();
   }
 
-  // === HEAD ===
   ctx.fillStyle = '#F5D6B3';
   ctx.beginPath();
   ctx.arc(cx, boss.y + 32, 20, 0, Math.PI * 2);
   ctx.fill();
 
-  // Wrinkles
   ctx.strokeStyle = '#8D6E63';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -832,7 +802,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.lineTo(cx + 10, boss.y + 27);
   ctx.stroke();
 
-  // Eyes — squinty wise
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -844,7 +813,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.lineTo(cx + 10, boss.y + 30);
   ctx.stroke();
 
-  // Small nose
   ctx.strokeStyle = '#8D6E63';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
@@ -852,7 +820,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.quadraticCurveTo(cx + 2, boss.y + 38, cx, boss.y + 40);
   ctx.stroke();
 
-  // === HUGE GREY BEARD ===
   const beardGrad = ctx.createLinearGradient(cx, boss.y + 40, cx, bodyTop + 60);
   beardGrad.addColorStop(0, '#EEEEEE');
   beardGrad.addColorStop(0.5, '#BDBDBD');
@@ -869,7 +836,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.closePath();
   ctx.fill();
 
-  // Beard texture — wispy lines
   ctx.strokeStyle = 'rgba(0,0,0,0.15)';
   ctx.lineWidth = 1;
   for (let i = -3; i <= 3; i++) {
@@ -879,7 +845,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
     ctx.stroke();
   }
 
-  // Moustache — merges with beard
   ctx.fillStyle = '#BDBDBD';
   ctx.beginPath();
   ctx.ellipse(cx - 6, boss.y + 40, 6, 3, -0.3, 0, Math.PI * 2);
@@ -888,7 +853,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.ellipse(cx + 6, boss.y + 40, 6, 3, 0.3, 0, Math.PI * 2);
   ctx.fill();
 
-  // === TALL KARAKUL HAT (папаха / телпек) ===
   ctx.fillStyle = '#3E2723';
   ctx.beginPath();
   ctx.moveTo(cx - 24, boss.y + 15);
@@ -898,7 +862,6 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.closePath();
   ctx.fill();
 
-  // Fluffy karakul texture
   ctx.fillStyle = '#5D4037';
   for (let i = -20; i < 20; i += 5) {
     ctx.beginPath();
@@ -916,11 +879,9 @@ function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
     ctx.fill();
   }
 
-  // Green band on hat
   ctx.fillStyle = '#1B5E20';
   ctx.fillRect(cx - 22, boss.y + 12, 44, 4);
 
-  // Small gold ornament on hat
   ctx.fillStyle = '#FFD700';
   drawStar(ctx, cx, boss.y - 5, 4);
 }
@@ -957,7 +918,7 @@ function drawBossHealthBar(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.fillStyle = '#FFF';
   ctx.font = 'bold 10px monospace';
   ctx.textAlign = 'center';
-  const bossName = boss.type === 'general' ? 'FAT GENERAL' : 'TURKMEN ELDER';
+  const bossName = boss.type === 'general' ? 'ТОЛСТЫЙ ГЕНЕРАЛ' : 'ТУРКМЕНСКИЙ СТАРЕЦ';
   ctx.fillText(`${bossName}  ${boss.hp}/${boss.maxHp}`, boss.x + boss.width / 2, by - 5);
   ctx.textAlign = 'left';
 }
@@ -985,27 +946,22 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile) {
     ctx.arc(p.width / 2 - 5, -p.height / 2 + 4, 3, 0, Math.PI * 2);
     ctx.fill();
   } else if (p.type === 'bowl') {
-    // Golden bowl of kumis
     ctx.fillStyle = '#FFD700';
     ctx.beginPath();
     ctx.arc(0, 0, p.width / 2, Math.PI * 0.1, Math.PI * 0.9);
     ctx.closePath();
     ctx.fill();
-    // Kumis liquid
     ctx.fillStyle = '#F5F5DC';
     ctx.beginPath();
     ctx.ellipse(0, -1, p.width / 2 - 3, 3, 0, 0, Math.PI * 2);
     ctx.fill();
-    // Rim shine
     ctx.strokeStyle = '#FFF59D';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(0, 0, p.width / 2, Math.PI * 0.1, Math.PI * 0.9);
     ctx.stroke();
   } else if (p.type === 'genie') {
-    // Purple swirling genie spirit
     const wave = Math.sin(p.rotation * 2) * 4;
-    // Trail
     ctx.fillStyle = 'rgba(156, 39, 176, 0.3)';
     ctx.beginPath();
     ctx.arc(-5, wave, 8, 0, Math.PI * 2);
@@ -1014,24 +970,20 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile) {
     ctx.beginPath();
     ctx.arc(-2, wave / 2, 9, 0, Math.PI * 2);
     ctx.fill();
-    // Main body
     ctx.fillStyle = '#9C27B0';
     ctx.beginPath();
     ctx.arc(0, 0, p.width / 2, 0, Math.PI * 2);
     ctx.fill();
-    // Face
     ctx.fillStyle = '#FFF';
     ctx.beginPath();
     ctx.arc(-3, -2, 2, 0, Math.PI * 2);
     ctx.arc(3, -2, 2, 0, Math.PI * 2);
     ctx.fill();
-    // Pupils
     ctx.fillStyle = '#000';
     ctx.beginPath();
     ctx.arc(-3, -2, 1, 0, Math.PI * 2);
     ctx.arc(3, -2, 1, 0, Math.PI * 2);
     ctx.fill();
-    // Wisp trail
     ctx.strokeStyle = '#E1BEE7';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1039,7 +991,6 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile) {
     ctx.quadraticCurveTo(-3, 10, -6, 8);
     ctx.stroke();
   } else {
-    // Poop / mini-mine from drone
     ctx.fillStyle = '#212121';
     ctx.beginPath();
     ctx.arc(0, 0, p.width / 2, 0, Math.PI * 2);
@@ -1079,7 +1030,6 @@ function drawPlayer(ctx: CanvasRenderingContext2D, player: Player, _time: number
       ctx.drawImage(crabImage, player.x, player.y, player.width, player.height);
     }
   } else {
-    // Fallback
     ctx.fillStyle = '#E53935';
     ctx.beginPath();
     ctx.ellipse(player.x + player.width / 2, player.y + player.height * 0.6, player.width * 0.38, player.height * 0.32, 0, 0, Math.PI * 2);
@@ -1114,7 +1064,6 @@ function drawUI(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.textAlign = 'center';
   ctx.fillText(`❤️ x${state.lives}`, CANVAS_WIDTH / 2 - 80, 30);
 
-  // Level indicator
   ctx.fillStyle = '#4CAF50';
   ctx.fillText(`L${state.currentLevel}`, CANVAS_WIDTH / 2 + 60, 30);
 
@@ -1135,8 +1084,8 @@ function drawUI(ctx: CanvasRenderingContext2D, state: GameState) {
     ctx.font = 'bold 13px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
     const bossText = state.boss.type === 'general'
-      ? '⚠ FAT GENERAL BOSS ⚠'
-      : '⚠ TURKMEN ELDER BOSS ⚠';
+      ? '⚠ БОСС: ТОЛСТЫЙ ГЕНЕРАЛ ⚠'
+      : '⚠ БОСС: ТУРКМЕНСКИЙ СТАРЕЦ ⚠';
     ctx.fillText(bossText, CANVAS_WIDTH / 2, 63);
     ctx.textAlign = 'left';
   }
@@ -1145,52 +1094,99 @@ function drawUI(ctx: CanvasRenderingContext2D, state: GameState) {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.fillStyle = '#FFD700';
-    ctx.font = 'bold 36px "Press Start 2P", monospace';
+    ctx.font = 'bold 32px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('🎉 BOSS DEFEATED! 🎉', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    ctx.fillText('🎉 БОСС ПОВЕРЖЕН! 🎉', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
     ctx.textAlign = 'left';
   }
 }
 
 function drawMenuScreen(ctx: CanvasRenderingContext2D) {
+  // Background gradient
   const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   bgGrad.addColorStop(0, '#0a0a1e');
-  bgGrad.addColorStop(1, '#1a0a2e');
+  bgGrad.addColorStop(0.5, '#1a0a2e');
+  bgGrad.addColorStop(1, '#0a0a1e');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+  // Neon red glow at top
+  const time = Date.now();
+  const pulse = 0.5 + 0.5 * Math.sin(time * 0.002);
+  ctx.fillStyle = `rgba(255, 30, 60, ${0.08 + pulse * 0.05})`;
+  ctx.fillRect(0, 0, CANVAS_WIDTH, 100);
+
+  // Title
+  ctx.save();
+  ctx.shadowColor = '#FF3D00';
+  ctx.shadowBlur = 20;
   ctx.fillStyle = '#FF5252';
-  ctx.font = 'bold 40px "Press Start 2P", monospace';
+  ctx.font = 'bold 42px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('🦀 FSB CRAB 🦀', CANVAS_WIDTH / 2, 90);
+  ctx.fillText('🦀 ФСБ КРАБ 🦀', CANVAS_WIDTH / 2, 75);
+  ctx.restore();
 
+  // Subtitle
   ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 22px "Press Start 2P", monospace';
-  ctx.fillText('AMBIRLAND HUNTER', CANVAS_WIDTH / 2, 130);
+  ctx.font = 'bold 20px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('ОХОТНИК ЗА AMBIRLAND', CANVAS_WIDTH / 2, 115);
 
-  ctx.fillStyle = '#fff';
+  // Divider
+  ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(150, 135);
+  ctx.lineTo(CANVAS_WIDTH - 150, 135);
+  ctx.stroke();
+
+  // Story teaser
+  ctx.fillStyle = '#FFF';
   ctx.font = '13px monospace';
-  const lines = [
-    'A totally serious game about crabs, beer,',
-    'and saving national pride.',
+  ctx.textAlign = 'center';
+  const teaser = [
+    'В стране АМБИРЛЕНДИЯ пропадает',
+    'легендарное золотое пиво "AMBIRLAND".',
     '',
-    '← → or A/D — Move | ↑/W/SPACE — Jump',
-    'Press JUMP twice for DOUBLE JUMP!',
-    '',
-    'LEVEL 1: Cabinet 14 — Fat General',
-    'LEVEL 2: Bar "13 Rules" — Turkmen Elder',
-    '',
-    'On phone: tap ⛶ for FULLSCREEN',
+    'Агент ФСБ по кличке КРАСНЫЙ КРАБ',
+    'должен раскрыть заговор пивоваров...',
   ];
-  lines.forEach((text, i) => {
-    ctx.fillText(text, CANVAS_WIDTH / 2, 180 + i * 22);
+  teaser.forEach((line, i) => {
+    ctx.fillText(line, CANVAS_WIDTH / 2, 165 + i * 20);
   });
 
-  const blink = Math.sin(Date.now() * 0.005) > 0;
+  // Level 1
+  ctx.fillStyle = '#FF8C00';
+  ctx.font = 'bold 12px "Press Start 2P", monospace';
+  ctx.fillText('УРОВЕНЬ 1 — КАБИНЕТ 14', CANVAS_WIDTH / 2, 295);
+  ctx.fillStyle = '#AAA';
+  ctx.font = '11px monospace';
+  ctx.fillText('Босс: Толстый Генерал', CANVAS_WIDTH / 2, 313);
+
+  // Level 2
+  ctx.fillStyle = '#9C27B0';
+  ctx.font = 'bold 12px "Press Start 2P", monospace';
+  ctx.fillText('УРОВЕНЬ 2 — БАР "13 RULES"', CANVAS_WIDTH / 2, 340);
+  ctx.fillStyle = '#AAA';
+  ctx.font = '11px monospace';
+  ctx.fillText('Босс: Туркменский Старец', CANVAS_WIDTH / 2, 358);
+
+  // Controls
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.font = '10px monospace';
+  ctx.fillText('← → или A/D — идти  |  ↑ / SPACE — прыжок  (х2 — двойной)', CANVAS_WIDTH / 2, 390);
+  ctx.fillText('На телефоне: жми ⛶ для полного экрана', CANVAS_WIDTH / 2, 407);
+
+  // Blinking start prompt
+  const blink = Math.sin(time * 0.005) > 0;
   if (blink) {
+    ctx.save();
+    ctx.shadowColor = '#4CAF50';
+    ctx.shadowBlur = 15;
     ctx.fillStyle = '#4CAF50';
     ctx.font = 'bold 18px "Press Start 2P", monospace';
-    ctx.fillText('Press SPACE / Tap to start!', CANVAS_WIDTH / 2, 445);
+    ctx.fillText('▶ НАЧАТЬ ИГРУ  (SPACE / TAP)', CANVAS_WIDTH / 2, 450);
+    ctx.restore();
   }
 
   ctx.textAlign = 'left';
@@ -1204,7 +1200,6 @@ function drawStoryScreen(
   totalPages: number,
   accentColor: string
 ) {
-  // Dark cinematic background
   const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   bgGrad.addColorStop(0, '#000');
   bgGrad.addColorStop(0.5, '#0a0a1e');
@@ -1212,13 +1207,11 @@ function drawStoryScreen(
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // Top bar with title
   ctx.fillStyle = accentColor;
   ctx.font = 'bold 20px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.fillText(title, CANVAS_WIDTH / 2, 50);
 
-  // Progress dots
   const dotY = 75;
   const dotSpacing = 15;
   const startX = CANVAS_WIDTH / 2 - ((totalPages - 1) * dotSpacing) / 2;
@@ -1229,7 +1222,6 @@ function drawStoryScreen(
     ctx.fill();
   }
 
-  // Text — split by \n, center each line
   ctx.fillStyle = '#FFF';
   ctx.font = '15px monospace';
   const lines = text.split('\n');
@@ -1238,7 +1230,6 @@ function drawStoryScreen(
   const startY = (CANVAS_HEIGHT - totalHeight) / 2 + 15;
 
   lines.forEach((line, i) => {
-    // Highlight uppercase words with color
     if (/[А-ЯA-Z]{3,}/.test(line) && !/^\s*$/.test(line)) {
       ctx.fillStyle = accentColor;
       ctx.font = 'bold 17px monospace';
@@ -1249,14 +1240,13 @@ function drawStoryScreen(
     ctx.fillText(line, CANVAS_WIDTH / 2, startY + i * lineHeight);
   });
 
-  // Continue prompt (bottom)
   const blink = Math.sin(Date.now() * 0.005) > 0;
   if (blink) {
     ctx.fillStyle = accentColor;
     ctx.font = 'bold 12px "Press Start 2P", monospace';
     const promptText = page < totalPages - 1
-      ? '▶ TAP / SPACE — CONTINUE'
-      : '▶ TAP / SPACE — BEGIN';
+      ? '▶ TAP / SPACE — ДАЛЬШЕ'
+      : '▶ TAP / SPACE — НАЧАТЬ';
     ctx.fillText(promptText, CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
   }
 
@@ -1271,23 +1261,23 @@ function drawGameOverScreen(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   ctx.fillStyle = '#FF1744';
-  ctx.font = 'bold 48px "Press Start 2P", monospace';
+  ctx.font = 'bold 44px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('💀 GAME OVER 💀', CANVAS_WIDTH / 2, 180);
+  ctx.fillText('💀 ИГРА ОКОНЧЕНА 💀', CANVAS_WIDTH / 2, 180);
 
   ctx.fillStyle = '#FFF';
   ctx.font = '18px "Press Start 2P", monospace';
-  ctx.fillText(`LEVEL ${state.currentLevel}`, CANVAS_WIDTH / 2, 240);
+  ctx.fillText(`УРОВЕНЬ ${state.currentLevel}`, CANVAS_WIDTH / 2, 240);
 
   ctx.fillStyle = '#FFD700';
   ctx.font = '16px "Press Start 2P", monospace';
-  ctx.fillText(`SCORE: ${state.score}`, CANVAS_WIDTH / 2, 285);
+  ctx.fillText(`ОЧКИ: ${state.score}`, CANVAS_WIDTH / 2, 285);
 
   const blink = Math.sin(Date.now() * 0.005) > 0;
   if (blink) {
     ctx.fillStyle = '#4CAF50';
     ctx.font = 'bold 16px "Press Start 2P", monospace';
-    ctx.fillText('Press SPACE / Tap to retry', CANVAS_WIDTH / 2, 380);
+    ctx.fillText('SPACE / TAP — начать сначала', CANVAS_WIDTH / 2, 380);
   }
 
   ctx.textAlign = 'left';
@@ -1299,7 +1289,6 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D, isFullscreen
   const btnY = CANVAS_HEIGHT - 75;
   const btnR = 40;
 
-  // LEFT
   ctx.globalAlpha = 0.55;
   ctx.fillStyle = '#000';
   ctx.beginPath();
@@ -1318,7 +1307,6 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D, isFullscreen
   ctx.textBaseline = 'middle';
   ctx.fillText('◀', 75, btnY);
 
-  // RIGHT
   ctx.globalAlpha = 0.55;
   ctx.fillStyle = '#000';
   ctx.beginPath();
@@ -1335,7 +1323,6 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D, isFullscreen
   ctx.font = 'bold 32px Arial';
   ctx.fillText('▶', 210, btnY);
 
-  // JUMP
   const jumpX = CANVAS_WIDTH - 80;
   ctx.globalAlpha = 0.55;
   ctx.fillStyle = '#4CAF50';
@@ -1355,7 +1342,6 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D, isFullscreen
   ctx.font = 'bold 10px monospace';
   ctx.fillText('x2 = ↑↑', jumpX, btnY + 12);
 
-  // FULLSCREEN toggle
   ctx.globalAlpha = 0.7;
   ctx.fillStyle = '#000';
   ctx.beginPath();
