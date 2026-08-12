@@ -5,7 +5,6 @@ import { render, renderMobileControls, loadImages } from './renderer';
 import { playJump, playCollect, playStomp, playHurt, playWin, playGameOver } from './audio';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
 
-// Detect touch device
 function isTouchDevice(): boolean {
   return (
     'ontouchstart' in window ||
@@ -16,19 +15,46 @@ function isTouchDevice(): boolean {
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef<Keys>({ left: false, right: false, up: false, space: false });
   const stateRef = useRef(createInitialState());
   const prevScoreRef = useRef(0);
   const prevLivesRef = useRef(3);
   const prevGameOverRef = useRef(false);
   const prevGameWonRef = useRef(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [, setIsMobile] = useState(false);
   const isMobileRef = useRef(false);
 
-  // Track which touch is pressing which button (multi-touch)
   const activeTouchesRef = useRef<Map<number, 'left' | 'right' | 'jump'>>(new Map());
-  // For "re-tap" double jump: pulse jump key
-  const jumpPulseRef = useRef(false);
+
+  // === Auto-resize canvas to fit screen while keeping aspect ratio ===
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Available viewport
+    const availW = window.innerWidth;
+    const availH = window.innerHeight;
+
+    const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+    const screenAspect = availW / availH;
+
+    let cssW: number;
+    let cssH: number;
+
+    if (screenAspect > aspect) {
+      // Screen wider than game — fit by height
+      cssH = availH;
+      cssW = availH * aspect;
+    } else {
+      // Screen taller/narrower than game — fit by width
+      cssW = availW;
+      cssH = availW / aspect;
+    }
+
+    canvas.style.width = `${cssW}px`;
+    canvas.style.height = `${cssH}px`;
+  }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const keys = keysRef.current;
@@ -76,7 +102,6 @@ export default function GameCanvas() {
     }
   }, []);
 
-  // Convert touch position to canvas coords and detect button
   const getButtonFromTouch = useCallback(
     (touch: Touch, rect: DOMRect): 'left' | 'right' | 'jump' | null => {
       const scaleX = CANVAS_WIDTH / rect.width;
@@ -84,15 +109,12 @@ export default function GameCanvas() {
       const x = (touch.clientX - rect.left) * scaleX;
       const y = (touch.clientY - rect.top) * scaleY;
 
-      // Left button: x 20-140, bottom
       if (x >= 20 && x <= 150 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
         return 'left';
       }
-      // Right button: x 160-280, bottom
       if (x >= 160 && x <= 290 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
         return 'right';
       }
-      // Jump button: right side
       if (x >= CANVAS_WIDTH - 160 && x <= CANVAS_WIDTH - 20 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
         return 'jump';
       }
@@ -107,7 +129,6 @@ export default function GameCanvas() {
 
     keys.left = false;
     keys.right = false;
-    // NOTE: don't reset jump/space here — they are pulsed separately
 
     let jumpHeld = false;
     active.forEach((btn) => {
@@ -116,7 +137,6 @@ export default function GameCanvas() {
       if (btn === 'jump') jumpHeld = true;
     });
 
-    // Keep jump held while finger is on jump button
     if (jumpHeld) {
       keys.up = true;
       keys.space = true;
@@ -136,7 +156,6 @@ export default function GameCanvas() {
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
 
-      // Tap-to-start / tap-to-restart when on menu screens
       const state = stateRef.current;
       const onMenu = !state.gameStarted || state.gameOver || state.gameWon;
 
@@ -146,21 +165,13 @@ export default function GameCanvas() {
 
         if (btn) {
           activeTouchesRef.current.set(touch.identifier, btn);
-
-          // For jump button: on menu → start game; in game → pulse jump for reliable double-jump
-          if (btn === 'jump') {
-            if (onMenu) {
-              keysRef.current.space = true;
-              setTimeout(() => {
-                keysRef.current.space = false;
-              }, 100);
-            } else {
-              // Pulse: release space for 1 frame so engine detects new press
-              jumpPulseRef.current = true;
-            }
+          if (btn === 'jump' && onMenu) {
+            keysRef.current.space = true;
+            setTimeout(() => {
+              keysRef.current.space = false;
+            }, 100);
           }
         } else if (onMenu) {
-          // Any tap outside buttons starts/restarts game
           keysRef.current.space = true;
           setTimeout(() => {
             keysRef.current.space = false;
@@ -180,7 +191,6 @@ export default function GameCanvas() {
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
 
-      // Update which button each finger is on
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         const btn = getButtonFromTouch(touch, rect);
@@ -217,6 +227,11 @@ export default function GameCanvas() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Initial resize + listeners
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('orientationchange', resizeCanvas);
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -228,15 +243,8 @@ export default function GameCanvas() {
 
     function gameLoop() {
       const state = stateRef.current;
-
-      // Handle jump pulse: release space for 1 frame, then re-press
-      // This makes double-jump work with a held finger (tap → tap)
-      // Handled via touchstart: we don't need extra logic here since
-      // touchstart re-fires each tap separately, giving natural edge-trigger.
-
       const newState = update(state, keysRef.current);
 
-      // Sound effects
       if (newState.score > prevScoreRef.current) {
         const diff = newState.score - prevScoreRef.current;
         if (diff >= 200) {
@@ -255,7 +263,6 @@ export default function GameCanvas() {
         playWin();
       }
 
-      // Detect jump for sound
       if (
         newState.gameStarted &&
         !newState.gameOver &&
@@ -286,6 +293,8 @@ export default function GameCanvas() {
 
     return () => {
       cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resizeCanvas);
+      window.removeEventListener('orientationchange', resizeCanvas);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       canvas.removeEventListener('touchstart', handleTouchStart);
@@ -293,20 +302,30 @@ export default function GameCanvas() {
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [handleKeyDown, handleKeyUp, handleTouchStart, handleTouchMove, handleTouchEnd]);
+  }, [handleKeyDown, handleKeyUp, handleTouchStart, handleTouchMove, handleTouchEnd, resizeCanvas]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={CANVAS_WIDTH}
-      height={CANVAS_HEIGHT}
-      className="block max-w-full max-h-screen border-4 border-amber-600 rounded-lg shadow-2xl"
+    <div
+      ref={wrapperRef}
       style={{
-        imageRendering: 'pixelated',
-        aspectRatio: `${CANVAS_WIDTH}/${CANVAS_HEIGHT}`,
-        touchAction: 'none', // prevent browser scrolling/zooming on canvas
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
       }}
-      tabIndex={0}
-    />
+    >
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        className="block border-4 border-amber-600 rounded-lg shadow-2xl"
+        style={{
+          imageRendering: 'pixelated',
+          touchAction: 'none',
+          display: 'block',
+        }}
+        tabIndex={0}
+      />
+    </div>
   );
 }
