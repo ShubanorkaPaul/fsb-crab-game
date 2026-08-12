@@ -24,17 +24,18 @@ export default function GameCanvas() {
   const prevGameWonRef = useRef(false);
   const [, setIsMobile] = useState(false);
   const isMobileRef = useRef(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const activeTouchesRef = useRef<Map<number, 'left' | 'right' | 'jump'>>(new Map());
 
-  // === Auto-resize canvas to fit screen while keeping aspect ratio ===
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Available viewport
-    const availW = window.innerWidth;
-    const availH = window.innerHeight;
+    // Use visualViewport if available (mobile handles this better)
+    const vv = window.visualViewport;
+    const availW = vv ? vv.width : window.innerWidth;
+    const availH = vv ? vv.height : window.innerHeight;
 
     const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
     const screenAspect = availW / availH;
@@ -43,11 +44,9 @@ export default function GameCanvas() {
     let cssH: number;
 
     if (screenAspect > aspect) {
-      // Screen wider than game — fit by height
       cssH = availH;
       cssW = availH * aspect;
     } else {
-      // Screen taller/narrower than game — fit by width
       cssW = availW;
       cssH = availW / aspect;
     }
@@ -55,6 +54,26 @@ export default function GameCanvas() {
     canvas.style.width = `${cssW}px`;
     canvas.style.height = `${cssH}px`;
   }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = wrapperRef.current || document.documentElement;
+    try {
+      if (!document.fullscreenElement) {
+        await el.requestFullscreen();
+        // Lock landscape orientation on mobile
+        if ((screen.orientation as any)?.lock) {
+          try { await (screen.orientation as any).lock('landscape'); } catch {}
+        }
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+      setTimeout(resizeCanvas, 200);
+    } catch (err) {
+      console.log('Fullscreen error:', err);
+    }
+  }, [resizeCanvas]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const keys = keysRef.current;
@@ -103,21 +122,27 @@ export default function GameCanvas() {
   }, []);
 
   const getButtonFromTouch = useCallback(
-    (touch: Touch, rect: DOMRect): 'left' | 'right' | 'jump' | null => {
+    (touch: Touch, rect: DOMRect): 'left' | 'right' | 'jump' | 'fs' | null => {
       const scaleX = CANVAS_WIDTH / rect.width;
       const scaleY = CANVAS_HEIGHT / rect.height;
       const x = (touch.clientX - rect.left) * scaleX;
       const y = (touch.clientY - rect.top) * scaleY;
 
-      if (x >= 20 && x <= 150 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
-        return 'left';
+      // Fullscreen button — top-right corner
+      if (x >= CANVAS_WIDTH - 55 && x <= CANVAS_WIDTH - 5 &&
+          y >= 5 && y <= 50) {
+        return 'fs';
       }
-      if (x >= 160 && x <= 290 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
-        return 'right';
-      }
-      if (x >= CANVAS_WIDTH - 160 && x <= CANVAS_WIDTH - 20 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
-        return 'jump';
-      }
+
+      // Movement/jump buttons area
+      const btnTop = CANVAS_HEIGHT - 140;
+      const btnBottom = CANVAS_HEIGHT;
+      if (y < btnTop || y > btnBottom) return null;
+
+      if (x >= 5 && x <= 145) return 'left';
+      if (x >= 150 && x <= 285) return 'right';
+      if (x >= CANVAS_WIDTH - 155 && x <= CANVAS_WIDTH - 5) return 'jump';
+
       return null;
     },
     []
@@ -163,25 +188,26 @@ export default function GameCanvas() {
         const touch = e.changedTouches[i];
         const btn = getButtonFromTouch(touch, rect);
 
+        if (btn === 'fs') {
+          toggleFullscreen();
+          continue;
+        }
+
         if (btn) {
           activeTouchesRef.current.set(touch.identifier, btn);
           if (btn === 'jump' && onMenu) {
             keysRef.current.space = true;
-            setTimeout(() => {
-              keysRef.current.space = false;
-            }, 100);
+            setTimeout(() => { keysRef.current.space = false; }, 100);
           }
         } else if (onMenu) {
           keysRef.current.space = true;
-          setTimeout(() => {
-            keysRef.current.space = false;
-          }, 100);
+          setTimeout(() => { keysRef.current.space = false; }, 100);
         }
       }
 
       updateKeysFromTouches();
     },
-    [getButtonFromTouch, updateKeysFromTouches]
+    [getButtonFromTouch, updateKeysFromTouches, toggleFullscreen]
   );
 
   const handleTouchMove = useCallback(
@@ -194,7 +220,7 @@ export default function GameCanvas() {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         const btn = getButtonFromTouch(touch, rect);
-        if (btn) {
+        if (btn && btn !== 'fs') {
           activeTouchesRef.current.set(touch.identifier, btn);
         } else {
           activeTouchesRef.current.delete(touch.identifier);
@@ -227,10 +253,13 @@ export default function GameCanvas() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Initial resize + listeners
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
-    window.addEventListener('orientationchange', resizeCanvas);
+    window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 200));
+    window.visualViewport?.addEventListener('resize', resizeCanvas);
+
+    // Try to scroll away address bar on mobile
+    setTimeout(() => window.scrollTo(0, 1), 300);
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -238,6 +267,11 @@ export default function GameCanvas() {
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
     canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+
+    document.addEventListener('fullscreenchange', () => {
+      setIsFullscreen(!!document.fullscreenElement);
+      setTimeout(resizeCanvas, 200);
+    });
 
     let animId: number;
 
@@ -247,21 +281,12 @@ export default function GameCanvas() {
 
       if (newState.score > prevScoreRef.current) {
         const diff = newState.score - prevScoreRef.current;
-        if (diff >= 200) {
-          playStomp();
-        } else {
-          playCollect();
-        }
+        if (diff >= 200) playStomp();
+        else playCollect();
       }
-      if (newState.lives < prevLivesRef.current) {
-        playHurt();
-      }
-      if (newState.gameOver && !prevGameOverRef.current) {
-        playGameOver();
-      }
-      if (newState.gameWon && !prevGameWonRef.current) {
-        playWin();
-      }
+      if (newState.lives < prevLivesRef.current) playHurt();
+      if (newState.gameOver && !prevGameOverRef.current) playGameOver();
+      if (newState.gameWon && !prevGameWonRef.current) playWin();
 
       if (
         newState.gameStarted &&
@@ -283,7 +308,7 @@ export default function GameCanvas() {
       render(ctx!, newState);
 
       if (isMobileRef.current) {
-        renderMobileControls(ctx!);
+        renderMobileControls(ctx!, isFullscreen);
       }
 
       animId = requestAnimationFrame(gameLoop);
@@ -294,7 +319,7 @@ export default function GameCanvas() {
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', resizeCanvas);
-      window.removeEventListener('orientationchange', resizeCanvas);
+      window.visualViewport?.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       canvas.removeEventListener('touchstart', handleTouchStart);
@@ -302,7 +327,7 @@ export default function GameCanvas() {
       canvas.removeEventListener('touchend', handleTouchEnd);
       canvas.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [handleKeyDown, handleKeyUp, handleTouchStart, handleTouchMove, handleTouchEnd, resizeCanvas]);
+  }, [handleKeyDown, handleKeyUp, handleTouchStart, handleTouchMove, handleTouchEnd, resizeCanvas, isFullscreen]);
 
   return (
     <div
@@ -312,13 +337,15 @@ export default function GameCanvas() {
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
+        height: '100%',
+        background: '#0a0a1e',
       }}
     >
       <canvas
         ref={canvasRef}
         width={CANVAS_WIDTH}
         height={CANVAS_HEIGHT}
-        className="block border-4 border-amber-600 rounded-lg shadow-2xl"
+        className="block"
         style={{
           imageRendering: 'pixelated',
           touchAction: 'none',
