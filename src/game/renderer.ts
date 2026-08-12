@@ -2,43 +2,92 @@ import { GameState, Platform, BeerCan, Enemy, Player, Particle, Cloud, Boss, Pro
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
+  STORY_PROLOGUE,
+  STORY_INTERLUDE,
+  STORY_FINALE,
 } from './constants';
 
 let crabImage: HTMLImageElement | null = null;
 let beerImage: HTMLImageElement | null = null;
-let bgImage: HTMLImageElement | null = null;
-let imagesLoaded = 0;
+let bgImage1: HTMLImageElement | null = null;
+let bgImage2: HTMLImageElement | null = null;
 
 export function loadImages() {
   crabImage = new Image();
   crabImage.src = '/images/crab-fsb.png';
-  crabImage.onload = () => imagesLoaded++;
 
   beerImage = new Image();
   beerImage.src = '/images/beer-can.png';
-  beerImage.onload = () => imagesLoaded++;
 
-  bgImage = new Image();
-  bgImage.src = '/images/background.png';
-  bgImage.onload = () => imagesLoaded++;
+  bgImage1 = new Image();
+  bgImage1.src = '/images/background.png';
+
+  bgImage2 = new Image();
+  bgImage2.src = '/images/background2.png';
 }
 
 export function render(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.save();
 
-  ctx.fillStyle = '#4a90d9';
+  // Non-gameplay screens
+  if (state.screen === 'menu') {
+    drawMenuScreen(ctx);
+    ctx.restore();
+    return;
+  }
+  if (state.screen === 'prologue') {
+    drawStoryScreen(ctx, 'ПРОЛОГ', STORY_PROLOGUE[state.storyPage] || '', state.storyPage, STORY_PROLOGUE.length, '#FFD700');
+    ctx.restore();
+    return;
+  }
+  if (state.screen === 'interlude') {
+    drawStoryScreen(ctx, 'МЕЖДУ УРОВНЯМИ', STORY_INTERLUDE[state.storyPage] || '', state.storyPage, STORY_INTERLUDE.length, '#FF8C00');
+    ctx.restore();
+    return;
+  }
+  if (state.screen === 'finale') {
+    drawStoryScreen(ctx, 'ФИНАЛ', STORY_FINALE[state.storyPage] || '', state.storyPage, STORY_FINALE.length, '#4CAF50');
+    ctx.restore();
+    return;
+  }
+  if (state.screen === 'gameOver') {
+    drawGameOverScreen(ctx, state);
+    ctx.restore();
+    return;
+  }
+
+  // Gameplay rendering
+  const currentBg = state.currentLevel === 1 ? bgImage1 : bgImage2;
+
+  // Sky/dark backdrop
+  ctx.fillStyle = state.currentLevel === 1 ? '#4a90d9' : '#1a0a1e';
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
-  skyGrad.addColorStop(0, '#1a1a4e');
-  skyGrad.addColorStop(0.3, '#4a90d9');
-  skyGrad.addColorStop(0.7, '#87CEEB');
-  skyGrad.addColorStop(1, '#b8e6f0');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  if (state.currentLevel === 1) {
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    skyGrad.addColorStop(0, '#1a1a4e');
+    skyGrad.addColorStop(0.3, '#4a90d9');
+    skyGrad.addColorStop(0.7, '#87CEEB');
+    skyGrad.addColorStop(1, '#b8e6f0');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  } else {
+    // Level 2: dark pub backdrop with red neon glow
+    const barGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+    barGrad.addColorStop(0, '#1a0a1e');
+    barGrad.addColorStop(0.4, '#2a0e1e');
+    barGrad.addColorStop(1, '#1a0505');
+    ctx.fillStyle = barGrad;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
-    const imgRatio = bgImage.naturalWidth / bgImage.naturalHeight;
+    // Pulsing red neon glow at top
+    const pulse = 0.7 + 0.3 * Math.sin(state.time * 0.1);
+    ctx.fillStyle = `rgba(255, 0, 60, ${0.05 * pulse})`;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, 150);
+  }
+
+  if (currentBg && currentBg.complete && currentBg.naturalWidth > 0) {
+    const imgRatio = currentBg.naturalWidth / currentBg.naturalHeight;
     const canvasRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
 
     let drawW = CANVAS_WIDTH;
@@ -56,10 +105,10 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
     const offsetY = (CANVAS_HEIGHT - drawH) / 2;
 
     ctx.globalAlpha = 0.55;
-    ctx.drawImage(bgImage, parallaxX, offsetY, drawW, drawH);
-    ctx.drawImage(bgImage, parallaxX + drawW, offsetY, drawW, drawH);
+    ctx.drawImage(currentBg, parallaxX, offsetY, drawW, drawH);
+    ctx.drawImage(currentBg, parallaxX + drawW, offsetY, drawW, drawH);
     if (parallaxX + drawW * 2 < CANVAS_WIDTH) {
-      ctx.drawImage(bgImage, parallaxX + drawW * 2, offsetY, drawW, drawH);
+      ctx.drawImage(currentBg, parallaxX + drawW * 2, offsetY, drawW, drawH);
     }
     ctx.globalAlpha = 1;
   }
@@ -70,11 +119,11 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.translate(-state.cameraX, 0);
 
   if (state.boss.alive || state.boss.active) {
-    drawArenaMarker(ctx, state.boss);
+    drawArenaMarker(ctx, state.boss, state.currentLevel);
   }
 
   for (const p of state.platforms) {
-    drawPlatform(ctx, p);
+    drawPlatform(ctx, p, state.currentLevel);
   }
 
   for (const beer of state.beers) {
@@ -110,10 +159,11 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.restore();
 }
 
-function drawArenaMarker(ctx: CanvasRenderingContext2D, boss: Boss) {
+function drawArenaMarker(ctx: CanvasRenderingContext2D, boss: Boss, level: number) {
+  const color = level === 1 ? 'rgba(255, 0, 0, 0.25)' : 'rgba(160, 0, 200, 0.35)';
   const g = ctx.createLinearGradient(boss.arenaLeft, 400, boss.arenaLeft, 460);
-  g.addColorStop(0, 'rgba(255, 0, 0, 0)');
-  g.addColorStop(1, 'rgba(255, 0, 0, 0.25)');
+  g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  g.addColorStop(1, color);
   ctx.fillStyle = g;
   ctx.fillRect(boss.arenaLeft, 400, boss.arenaRight - boss.arenaLeft, 60);
 }
@@ -135,26 +185,43 @@ function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.fill();
 }
 
-function drawPlatform(ctx: CanvasRenderingContext2D, p: Platform) {
+function drawPlatform(ctx: CanvasRenderingContext2D, p: Platform, level: number) {
   if (p.type === 'ground') {
-    const grassGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.height);
-    grassGrad.addColorStop(0, '#4CAF50');
-    grassGrad.addColorStop(0.15, '#388E3C');
-    grassGrad.addColorStop(0.15, '#8B4513');
-    grassGrad.addColorStop(1, '#654321');
-    ctx.fillStyle = grassGrad;
-    ctx.fillRect(p.x, p.y, p.width, p.height);
-
-    ctx.fillStyle = '#66BB6A';
-    for (let gx = p.x; gx < p.x + p.width; gx += 12) {
-      ctx.fillRect(gx, p.y - 2, 3, 5);
-      ctx.fillRect(gx + 6, p.y - 1, 2, 4);
+    if (level === 1) {
+      const grassGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.height);
+      grassGrad.addColorStop(0, '#4CAF50');
+      grassGrad.addColorStop(0.15, '#388E3C');
+      grassGrad.addColorStop(0.15, '#8B4513');
+      grassGrad.addColorStop(1, '#654321');
+      ctx.fillStyle = grassGrad;
+      ctx.fillRect(p.x, p.y, p.width, p.height);
+      ctx.fillStyle = '#66BB6A';
+      for (let gx = p.x; gx < p.x + p.width; gx += 12) {
+        ctx.fillRect(gx, p.y - 2, 3, 5);
+        ctx.fillRect(gx + 6, p.y - 1, 2, 4);
+      }
+    } else {
+      // Level 2: wooden bar floor
+      const floorGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.height);
+      floorGrad.addColorStop(0, '#5D3A1A');
+      floorGrad.addColorStop(0.1, '#4A2E15');
+      floorGrad.addColorStop(1, '#2A1A08');
+      ctx.fillStyle = floorGrad;
+      ctx.fillRect(p.x, p.y, p.width, p.height);
+      // Wooden planks
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 1;
+      for (let gx = p.x; gx < p.x + p.width; gx += 40) {
+        ctx.beginPath();
+        ctx.moveTo(gx, p.y);
+        ctx.lineTo(gx, p.y + p.height);
+        ctx.stroke();
+      }
     }
   } else if (p.type === 'brick') {
-    ctx.fillStyle = '#CD853F';
+    ctx.fillStyle = level === 1 ? '#CD853F' : '#6D4C41';
     ctx.fillRect(p.x, p.y, p.width, p.height);
-
-    ctx.strokeStyle = '#8B6914';
+    ctx.strokeStyle = level === 1 ? '#8B6914' : '#3E2723';
     ctx.lineWidth = 1;
     const brickW = 20;
     const brickH = p.height / 2;
@@ -164,23 +231,89 @@ function drawPlatform(ctx: CanvasRenderingContext2D, p: Platform) {
         ctx.strokeRect(bx, p.y + row * brickH, brickW, brickH);
       }
     }
-
     ctx.fillStyle = 'rgba(255,255,255,0.2)';
     ctx.fillRect(p.x, p.y, p.width, 2);
     ctx.fillStyle = 'rgba(0,0,0,0.2)';
     ctx.fillRect(p.x, p.y + p.height - 2, p.width, 2);
   } else if (p.type === 'pipe') {
-    const pipeGrad = ctx.createLinearGradient(p.x, p.y, p.x + p.width, p.y);
-    pipeGrad.addColorStop(0, '#2E7D32');
-    pipeGrad.addColorStop(0.3, '#4CAF50');
-    pipeGrad.addColorStop(0.7, '#388E3C');
-    pipeGrad.addColorStop(1, '#1B5E20');
-    ctx.fillStyle = pipeGrad;
+    if (level === 1) {
+      const pipeGrad = ctx.createLinearGradient(p.x, p.y, p.x + p.width, p.y);
+      pipeGrad.addColorStop(0, '#2E7D32');
+      pipeGrad.addColorStop(0.3, '#4CAF50');
+      pipeGrad.addColorStop(0.7, '#388E3C');
+      pipeGrad.addColorStop(1, '#1B5E20');
+      ctx.fillStyle = pipeGrad;
+      ctx.fillRect(p.x, p.y, p.width, p.height);
+      ctx.fillRect(p.x - 5, p.y, p.width + 10, 15);
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.fillRect(p.x + 5, p.y + 15, 8, p.height - 15);
+    } else {
+      // Level 2: beer tap — metallic with "13R" plaque
+      const tapGrad = ctx.createLinearGradient(p.x, p.y, p.x + p.width, p.y);
+      tapGrad.addColorStop(0, '#455A64');
+      tapGrad.addColorStop(0.3, '#78909C');
+      tapGrad.addColorStop(0.7, '#546E7A');
+      tapGrad.addColorStop(1, '#37474F');
+      ctx.fillStyle = tapGrad;
+      ctx.fillRect(p.x, p.y, p.width, p.height);
+      // Handle on top
+      ctx.fillStyle = '#B71C1C';
+      ctx.fillRect(p.x - 8, p.y - 12, p.width + 16, 12);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(p.x - 8, p.y - 12, p.width + 16, 3);
+      // Plaque "13R"
+      ctx.fillStyle = '#FFD700';
+      ctx.fillRect(p.x + 8, p.y + 20, p.width - 16, 15);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('13R', p.x + p.width / 2, p.y + 31);
+      ctx.textAlign = 'left';
+      // Highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(p.x + 4, p.y + 15, 4, p.height - 20);
+    }
+  } else if (p.type === 'bar') {
+    // Bar counter — polished wooden platform
+    const barGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.height);
+    barGrad.addColorStop(0, '#8D6E63');
+    barGrad.addColorStop(0.5, '#5D4037');
+    barGrad.addColorStop(1, '#3E2723');
+    ctx.fillStyle = barGrad;
     ctx.fillRect(p.x, p.y, p.width, p.height);
-
-    ctx.fillRect(p.x - 5, p.y, p.width + 10, 15);
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillRect(p.x + 5, p.y + 15, 8, p.height - 15);
+    // Glossy highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(p.x, p.y, p.width, 3);
+    // Bottom edge
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(p.x, p.y + p.height - 2, p.width, 2);
+  } else if (p.type === 'barrel') {
+    // Wooden beer barrel
+    const barrelGrad = ctx.createLinearGradient(p.x, p.y, p.x, p.y + p.height);
+    barrelGrad.addColorStop(0, '#8D6E63');
+    barrelGrad.addColorStop(0.5, '#5D4037');
+    barrelGrad.addColorStop(1, '#3E2723');
+    ctx.fillStyle = barrelGrad;
+    ctx.fillRect(p.x, p.y, p.width, p.height);
+    // Metal bands
+    ctx.fillStyle = '#9E9E9E';
+    ctx.fillRect(p.x, p.y + 2, p.width, 3);
+    ctx.fillRect(p.x, p.y + p.height - 5, p.width, 3);
+    // Vertical planks
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 1;
+    for (let bx = p.x + 8; bx < p.x + p.width; bx += 12) {
+      ctx.beginPath();
+      ctx.moveTo(bx, p.y + 3);
+      ctx.lineTo(bx, p.y + p.height - 3);
+      ctx.stroke();
+    }
+    // "13R" label
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 8px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('13R', p.x + p.width / 2, p.y + p.height / 2 + 3);
+    ctx.textAlign = 'left';
   }
 }
 
@@ -201,37 +334,16 @@ function drawBeer(ctx: CanvasRenderingContext2D, beer: BeerCan, time: number) {
   if (beerImage && beerImage.complete && beerImage.naturalWidth > 0) {
     ctx.drawImage(beerImage, beer.x, drawY, beer.width, beer.height);
   } else {
-    const canGrad = ctx.createLinearGradient(beer.x, drawY, beer.x + beer.width, drawY);
-    canGrad.addColorStop(0, '#DAA520');
-    canGrad.addColorStop(0.5, '#FFD700');
-    canGrad.addColorStop(1, '#B8860B');
-    ctx.fillStyle = canGrad;
-
-    const r = 5;
-    ctx.beginPath();
-    ctx.moveTo(beer.x + r, drawY);
-    ctx.lineTo(beer.x + beer.width - r, drawY);
-    ctx.quadraticCurveTo(beer.x + beer.width, drawY, beer.x + beer.width, drawY + r);
-    ctx.lineTo(beer.x + beer.width, drawY + beer.height - r);
-    ctx.quadraticCurveTo(beer.x + beer.width, drawY + beer.height, beer.x + beer.width - r, drawY + beer.height);
-    ctx.lineTo(beer.x + r, drawY + beer.height);
-    ctx.quadraticCurveTo(beer.x, drawY + beer.height, beer.x, drawY + beer.height - r);
-    ctx.lineTo(beer.x, drawY + r);
-    ctx.quadraticCurveTo(beer.x, drawY, beer.x + r, drawY);
-    ctx.fill();
-
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(beer.x, drawY, beer.width, beer.height);
     ctx.fillStyle = '#8B0000';
     ctx.fillRect(beer.x + 2, drawY + 12, beer.width - 4, 20);
-
     ctx.fillStyle = '#FFD700';
     ctx.font = 'bold 7px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('AMBIR', beer.x + beer.width / 2, drawY + 24);
     ctx.fillText('LAND', beer.x + beer.width / 2, drawY + 31);
     ctx.textAlign = 'left';
-
-    ctx.fillStyle = '#C0C0C0';
-    ctx.fillRect(beer.x + 3, drawY, beer.width - 6, 5);
   }
 }
 
@@ -317,7 +429,7 @@ function drawDrone(ctx: CanvasRenderingContext2D, e: Enemy) {
 
   ctx.strokeStyle = '#455A64';
   ctx.lineWidth = 3;
-  const armEnds = [
+  const armEnds: [number, number][] = [
     [cx - 20, cy - 12],
     [cx + 20, cy - 12],
     [cx - 20, cy + 12],
@@ -510,6 +622,18 @@ function drawBoss(ctx: CanvasRenderingContext2D, boss: Boss, _time: number) {
     ctx.translate(-(boss.x + boss.width / 2), 0);
   }
 
+  if (boss.type === 'general') {
+    drawGeneralBoss(ctx, boss);
+  } else {
+    drawTurkmenElder(ctx, boss);
+  }
+
+  ctx.restore();
+
+  drawBossHealthBar(ctx, boss);
+}
+
+function drawGeneralBoss(ctx: CanvasRenderingContext2D, boss: Boss) {
   const cx = boss.x + boss.width / 2;
   const bodyTop = boss.y + 45;
 
@@ -540,8 +664,6 @@ function drawBoss(ctx: CanvasRenderingContext2D, boss: Boss, _time: number) {
   ctx.fillRect(boss.x + 8, bodyTop + 55, boss.width - 16, 8);
   ctx.fillStyle = '#FFD700';
   ctx.fillRect(cx - 8, bodyTop + 55, 16, 8);
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.fillRect(boss.x + 8, bodyTop + 56, boss.width - 16, 2);
 
   ctx.fillStyle = '#8B0000';
   ctx.fillRect(boss.x + 10, bodyTop + 5, 25, 8);
@@ -616,21 +738,191 @@ function drawBoss(ctx: CanvasRenderingContext2D, boss: Boss, _time: number) {
   ctx.ellipse(cx, boss.y + 10, 26, 8, 0, Math.PI, 0);
   ctx.fill();
   ctx.fillRect(cx - 26, boss.y + 10, 52, 4);
-
   ctx.fillStyle = '#B71C1C';
   ctx.fillRect(cx - 26, boss.y + 12, 52, 3);
-
   ctx.fillStyle = '#000';
   ctx.beginPath();
   ctx.ellipse(cx, boss.y + 17, 30, 3, 0, 0, Math.PI);
   ctx.fill();
-
   ctx.fillStyle = '#FFD700';
   drawStar(ctx, cx, boss.y + 8, 5);
+}
 
-  ctx.restore();
+/**
+ * TURKMEN ELDER — boss of Level 2 (Bar "13 Rules").
+ * Ancient man in long white robe, tall karakul hat, HUGE grey beard.
+ */
+function drawTurkmenElder(ctx: CanvasRenderingContext2D, boss: Boss) {
+  const cx = boss.x + boss.width / 2;
+  const bodyTop = boss.y + 45;
+  const bodyBottom = boss.y + boss.height;
 
-  drawBossHealthBar(ctx, boss);
+  // Long white/cream robe (халат)
+  const robeGrad = ctx.createLinearGradient(boss.x, bodyTop, boss.x, bodyBottom);
+  robeGrad.addColorStop(0, '#F5F5DC');
+  robeGrad.addColorStop(1, '#D7CCC8');
+  ctx.fillStyle = robeGrad;
+  ctx.beginPath();
+  ctx.moveTo(boss.x + 15, bodyBottom);
+  ctx.lineTo(boss.x + boss.width - 15, bodyBottom);
+  ctx.lineTo(boss.x + boss.width - 25, bodyTop);
+  ctx.lineTo(boss.x + 25, bodyTop);
+  ctx.closePath();
+  ctx.fill();
+
+  // Turkmen ornament on robe (red patterns)
+  ctx.fillStyle = '#B71C1C';
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx, bodyTop + 15 + i * 18);
+    ctx.lineTo(cx - 6, bodyTop + 22 + i * 18);
+    ctx.lineTo(cx, bodyTop + 29 + i * 18);
+    ctx.lineTo(cx + 6, bodyTop + 22 + i * 18);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Green belt (sash)
+  ctx.fillStyle = '#1B5E20';
+  ctx.fillRect(boss.x + 18, bodyTop + 55, boss.width - 36, 7);
+  ctx.fillStyle = '#FFD700';
+  ctx.fillRect(cx - 5, bodyTop + 55, 10, 7);
+
+  // Sleeves
+  ctx.fillStyle = '#EEEEEE';
+  ctx.beginPath();
+  ctx.ellipse(boss.x + 12, bodyTop + 35, 12, 22, -0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(boss.x + boss.width - 12, bodyTop + 35, 12, 22, 0.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hands
+  ctx.fillStyle = '#F5D6B3';
+  ctx.beginPath();
+  ctx.arc(boss.x + 9, bodyTop + 55, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(boss.x + boss.width - 9, bodyTop + 55, 6, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Prayer beads in one hand
+  ctx.fillStyle = '#795548';
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.arc(boss.x + 5 + i * 3, bodyTop + 65, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // === HEAD ===
+  ctx.fillStyle = '#F5D6B3';
+  ctx.beginPath();
+  ctx.arc(cx, boss.y + 32, 20, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wrinkles
+  ctx.strokeStyle = '#8D6E63';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 10, boss.y + 27);
+  ctx.lineTo(cx - 5, boss.y + 28);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 5, boss.y + 28);
+  ctx.lineTo(cx + 10, boss.y + 27);
+  ctx.stroke();
+
+  // Eyes — squinty wise
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(cx - 10, boss.y + 30);
+  ctx.lineTo(cx - 3, boss.y + 30);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 3, boss.y + 30);
+  ctx.lineTo(cx + 10, boss.y + 30);
+  ctx.stroke();
+
+  // Small nose
+  ctx.strokeStyle = '#8D6E63';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx, boss.y + 33);
+  ctx.quadraticCurveTo(cx + 2, boss.y + 38, cx, boss.y + 40);
+  ctx.stroke();
+
+  // === HUGE GREY BEARD ===
+  const beardGrad = ctx.createLinearGradient(cx, boss.y + 40, cx, bodyTop + 60);
+  beardGrad.addColorStop(0, '#EEEEEE');
+  beardGrad.addColorStop(0.5, '#BDBDBD');
+  beardGrad.addColorStop(1, '#9E9E9E');
+  ctx.fillStyle = beardGrad;
+
+  ctx.beginPath();
+  ctx.moveTo(cx - 15, boss.y + 42);
+  ctx.quadraticCurveTo(cx - 22, boss.y + 65, cx - 20, bodyTop + 40);
+  ctx.quadraticCurveTo(cx - 15, bodyTop + 60, cx, bodyTop + 65);
+  ctx.quadraticCurveTo(cx + 15, bodyTop + 60, cx + 20, bodyTop + 40);
+  ctx.quadraticCurveTo(cx + 22, boss.y + 65, cx + 15, boss.y + 42);
+  ctx.quadraticCurveTo(cx, boss.y + 46, cx - 15, boss.y + 42);
+  ctx.closePath();
+  ctx.fill();
+
+  // Beard texture — wispy lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+  ctx.lineWidth = 1;
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx + i * 5, boss.y + 45);
+    ctx.quadraticCurveTo(cx + i * 6, boss.y + 55, cx + i * 4, bodyTop + 55);
+    ctx.stroke();
+  }
+
+  // Moustache — merges with beard
+  ctx.fillStyle = '#BDBDBD';
+  ctx.beginPath();
+  ctx.ellipse(cx - 6, boss.y + 40, 6, 3, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 6, boss.y + 40, 6, 3, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // === TALL KARAKUL HAT (папаха / телпек) ===
+  ctx.fillStyle = '#3E2723';
+  ctx.beginPath();
+  ctx.moveTo(cx - 24, boss.y + 15);
+  ctx.lineTo(cx - 20, boss.y - 20);
+  ctx.lineTo(cx + 20, boss.y - 20);
+  ctx.lineTo(cx + 24, boss.y + 15);
+  ctx.closePath();
+  ctx.fill();
+
+  // Fluffy karakul texture
+  ctx.fillStyle = '#5D4037';
+  for (let i = -20; i < 20; i += 5) {
+    ctx.beginPath();
+    ctx.arc(cx + i, boss.y - 15 + Math.abs(i) * 0.3, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = -18; i < 18; i += 5) {
+    ctx.beginPath();
+    ctx.arc(cx + i, boss.y - 5 + Math.abs(i) * 0.2, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (let i = -22; i < 22; i += 5) {
+    ctx.beginPath();
+    ctx.arc(cx + i, boss.y + 8, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Green band on hat
+  ctx.fillStyle = '#1B5E20';
+  ctx.fillRect(cx - 22, boss.y + 12, 44, 4);
+
+  // Small gold ornament on hat
+  ctx.fillStyle = '#FFD700';
+  drawStar(ctx, cx, boss.y - 5, 4);
 }
 
 function drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) {
@@ -647,14 +939,13 @@ function drawStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: numb
 }
 
 function drawBossHealthBar(ctx: CanvasRenderingContext2D, boss: Boss) {
-  const barW = 100;
-  const barH = 10;
+  const barW = 120;
+  const barH = 12;
   const bx = boss.x + boss.width / 2 - barW / 2;
-  const by = boss.y - 20;
+  const by = boss.y - 22;
 
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
   ctx.fillRect(bx - 2, by - 2, barW + 4, barH + 4);
-
   ctx.fillStyle = '#3E1010';
   ctx.fillRect(bx, by, barW, barH);
 
@@ -666,7 +957,8 @@ function drawBossHealthBar(ctx: CanvasRenderingContext2D, boss: Boss) {
   ctx.fillStyle = '#FFF';
   ctx.font = 'bold 10px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(`BOSS: ${boss.hp}/${boss.maxHp}`, boss.x + boss.width / 2, by - 6);
+  const bossName = boss.type === 'general' ? 'FAT GENERAL' : 'TURKMEN ELDER';
+  ctx.fillText(`${bossName}  ${boss.hp}/${boss.maxHp}`, boss.x + boss.width / 2, by - 5);
   ctx.textAlign = 'left';
 }
 
@@ -692,7 +984,62 @@ function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile) {
     ctx.beginPath();
     ctx.arc(p.width / 2 - 5, -p.height / 2 + 4, 3, 0, Math.PI * 2);
     ctx.fill();
+  } else if (p.type === 'bowl') {
+    // Golden bowl of kumis
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(0, 0, p.width / 2, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.closePath();
+    ctx.fill();
+    // Kumis liquid
+    ctx.fillStyle = '#F5F5DC';
+    ctx.beginPath();
+    ctx.ellipse(0, -1, p.width / 2 - 3, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Rim shine
+    ctx.strokeStyle = '#FFF59D';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, p.width / 2, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.stroke();
+  } else if (p.type === 'genie') {
+    // Purple swirling genie spirit
+    const wave = Math.sin(p.rotation * 2) * 4;
+    // Trail
+    ctx.fillStyle = 'rgba(156, 39, 176, 0.3)';
+    ctx.beginPath();
+    ctx.arc(-5, wave, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(156, 39, 176, 0.5)';
+    ctx.beginPath();
+    ctx.arc(-2, wave / 2, 9, 0, Math.PI * 2);
+    ctx.fill();
+    // Main body
+    ctx.fillStyle = '#9C27B0';
+    ctx.beginPath();
+    ctx.arc(0, 0, p.width / 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Face
+    ctx.fillStyle = '#FFF';
+    ctx.beginPath();
+    ctx.arc(-3, -2, 2, 0, Math.PI * 2);
+    ctx.arc(3, -2, 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Pupils
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(-3, -2, 1, 0, Math.PI * 2);
+    ctx.arc(3, -2, 1, 0, Math.PI * 2);
+    ctx.fill();
+    // Wisp trail
+    ctx.strokeStyle = '#E1BEE7';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, 5);
+    ctx.quadraticCurveTo(-3, 10, -6, 8);
+    ctx.stroke();
   } else {
+    // Poop / mini-mine from drone
     ctx.fillStyle = '#212121';
     ctx.beginPath();
     ctx.arc(0, 0, p.width / 2, 0, Math.PI * 2);
@@ -732,51 +1079,17 @@ function drawPlayer(ctx: CanvasRenderingContext2D, player: Player, _time: number
       ctx.drawImage(crabImage, player.x, player.y, player.width, player.height);
     }
   } else {
-    drawPixelCrab(ctx, player);
+    // Fallback
+    ctx.fillStyle = '#E53935';
+    ctx.beginPath();
+    ctx.ellipse(player.x + player.width / 2, player.y + player.height * 0.6, player.width * 0.38, player.height * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('ФСБ', player.x + player.width / 2, player.y + player.height * 0.24);
+    ctx.textAlign = 'left';
   }
-
-  ctx.restore();
-}
-
-function drawPixelCrab(ctx: CanvasRenderingContext2D, player: Player) {
-  const x = player.x;
-  const y = player.y;
-  const w = player.width;
-  const h = player.height;
-
-  const flip = !player.facingRight;
-  ctx.save();
-  if (flip) {
-    ctx.translate(x + w / 2, 0);
-    ctx.scale(-1, 1);
-    ctx.translate(-(x + w / 2), 0);
-  }
-
-  ctx.fillStyle = '#E53935';
-  ctx.beginPath();
-  ctx.ellipse(x + w / 2, y + h * 0.6, w * 0.38, h * 0.32, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#C62828';
-  ctx.beginPath();
-  ctx.ellipse(x + w / 2, y + h * 0.55, w * 0.25, h * 0.2, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.arc(x + w * 0.37, y + h * 0.34, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x + w * 0.67, y + h * 0.34, 3, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#1B5E20';
-  ctx.fillRect(x + w * 0.2, y + h * 0.12, w * 0.6, h * 0.16);
-  ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 9px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('FSB', x + w / 2, y + h * 0.24);
-  ctx.textAlign = 'left';
 
   ctx.restore();
 }
@@ -789,17 +1102,21 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle) {
 }
 
 function drawUI(ctx: CanvasRenderingContext2D, state: GameState) {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
   ctx.fillRect(0, 0, CANVAS_WIDTH, 45);
 
   ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 20px "Press Start 2P", monospace';
+  ctx.font = 'bold 18px "Press Start 2P", monospace';
   ctx.textAlign = 'left';
   ctx.fillText(`🍺 ${state.score}`, 20, 30);
 
   ctx.fillStyle = '#FF5252';
   ctx.textAlign = 'center';
-  ctx.fillText(`❤️ x${state.lives}`, CANVAS_WIDTH / 2, 30);
+  ctx.fillText(`❤️ x${state.lives}`, CANVAS_WIDTH / 2 - 80, 30);
+
+  // Level indicator
+  ctx.fillStyle = '#4CAF50';
+  ctx.fillText(`L${state.currentLevel}`, CANVAS_WIDTH / 2 + 60, 30);
 
   const totalBeers = state.beers.length;
   const collected = state.beers.filter(b => b.collected).length;
@@ -811,80 +1128,166 @@ function drawUI(ctx: CanvasRenderingContext2D, state: GameState) {
 
   if (state.boss.active && state.boss.alive) {
     const pulse = 0.5 + 0.5 * Math.sin(state.time * 0.15);
-    ctx.fillStyle = `rgba(244, 67, 54, ${0.15 + pulse * 0.15})`;
+    const bossColor = state.boss.type === 'general' ? '244, 67, 54' : '156, 39, 176';
+    ctx.fillStyle = `rgba(${bossColor}, ${0.15 + pulse * 0.15})`;
     ctx.fillRect(0, 45, CANVAS_WIDTH, 25);
     ctx.fillStyle = '#FFF';
-    ctx.font = 'bold 14px "Press Start 2P", monospace';
+    ctx.font = 'bold 13px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('⚠ GENERAL BOSS FIGHT ⚠', CANVAS_WIDTH / 2, 63);
+    const bossText = state.boss.type === 'general'
+      ? '⚠ FAT GENERAL BOSS ⚠'
+      : '⚠ TURKMEN ELDER BOSS ⚠';
+    ctx.fillText(bossText, CANVAS_WIDTH / 2, 63);
     ctx.textAlign = 'left';
   }
 
-  if (state.gameOver) {
-    drawOverlay(ctx, '💀 GAME OVER 💀', '#FF1744', 'Press SPACE / Tap to restart');
-  }
-
   if (state.gameWon) {
-    drawOverlay(ctx, '🎉 VICTORY! 🎉', '#FFD700', `Boss defeated! Score: ${state.score} | Tap to restart`);
-  }
-
-  if (!state.gameStarted) {
-    drawStartScreen(ctx);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 36px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('🎉 BOSS DEFEATED! 🎉', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    ctx.textAlign = 'left';
   }
 }
 
-function drawOverlay(ctx: CanvasRenderingContext2D, title: string, color: string, subtitle: string) {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-  ctx.fillStyle = color;
-  ctx.font = 'bold 36px "Press Start 2P", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(title, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
-
-  ctx.fillStyle = '#fff';
-  ctx.font = '14px "Press Start 2P", monospace';
-  ctx.fillText(subtitle, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
-  ctx.textAlign = 'left';
-}
-
-function drawStartScreen(ctx: CanvasRenderingContext2D) {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+function drawMenuScreen(ctx: CanvasRenderingContext2D) {
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  bgGrad.addColorStop(0, '#0a0a1e');
+  bgGrad.addColorStop(1, '#1a0a2e');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   ctx.fillStyle = '#FF5252';
-  ctx.font = 'bold 32px "Press Start 2P", monospace';
+  ctx.font = 'bold 40px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('🦀 FSB CRAB 🦀', CANVAS_WIDTH / 2, 80);
+  ctx.fillText('🦀 FSB CRAB 🦀', CANVAS_WIDTH / 2, 90);
 
   ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 20px "Press Start 2P", monospace';
-  ctx.fillText('AMBIRLAND HUNTER', CANVAS_WIDTH / 2, 115);
+  ctx.font = 'bold 22px "Press Start 2P", monospace';
+  ctx.fillText('AMBIRLAND HUNTER', CANVAS_WIDTH / 2, 130);
 
   ctx.fillStyle = '#fff';
   ctx.font = '13px monospace';
-  const instructions = [
-    '← → or A/D — Move | ↑ / W / SPACE — Jump',
+  const lines = [
+    'A totally serious game about crabs, beer,',
+    'and saving national pride.',
+    '',
+    '← → or A/D — Move | ↑/W/SPACE — Jump',
     'Press JUMP twice for DOUBLE JUMP!',
     '',
-    'ENEMIES: 🍾 Bottle · 🐀 Rat · 🛸 Drone',
-    '         💣 Mine · 🇺🇦 Cossack',
+    'LEVEL 1: Cabinet 14 — Fat General',
+    'LEVEL 2: Bar "13 Rules" — Turkmen Elder',
     '',
-    'FINAL BOSS: 🎖 Fat General',
-    'Stomp him 3 times to WIN!',
-    '',
-    'On phone: tap ⛶ button for FULLSCREEN',
+    'On phone: tap ⛶ for FULLSCREEN',
   ];
-
-  instructions.forEach((text, i) => {
-    ctx.fillText(text, CANVAS_WIDTH / 2, 155 + i * 22);
+  lines.forEach((text, i) => {
+    ctx.fillText(text, CANVAS_WIDTH / 2, 180 + i * 22);
   });
 
   const blink = Math.sin(Date.now() * 0.005) > 0;
   if (blink) {
     ctx.fillStyle = '#4CAF50';
+    ctx.font = 'bold 18px "Press Start 2P", monospace';
+    ctx.fillText('Press SPACE / Tap to start!', CANVAS_WIDTH / 2, 445);
+  }
+
+  ctx.textAlign = 'left';
+}
+
+function drawStoryScreen(
+  ctx: CanvasRenderingContext2D,
+  title: string,
+  text: string,
+  page: number,
+  totalPages: number,
+  accentColor: string
+) {
+  // Dark cinematic background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  bgGrad.addColorStop(0, '#000');
+  bgGrad.addColorStop(0.5, '#0a0a1e');
+  bgGrad.addColorStop(1, '#000');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  // Top bar with title
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 20px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(title, CANVAS_WIDTH / 2, 50);
+
+  // Progress dots
+  const dotY = 75;
+  const dotSpacing = 15;
+  const startX = CANVAS_WIDTH / 2 - ((totalPages - 1) * dotSpacing) / 2;
+  for (let i = 0; i < totalPages; i++) {
+    ctx.fillStyle = i === page ? accentColor : 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.arc(startX + i * dotSpacing, dotY, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Text — split by \n, center each line
+  ctx.fillStyle = '#FFF';
+  ctx.font = '15px monospace';
+  const lines = text.split('\n');
+  const lineHeight = 26;
+  const totalHeight = lines.length * lineHeight;
+  const startY = (CANVAS_HEIGHT - totalHeight) / 2 + 15;
+
+  lines.forEach((line, i) => {
+    // Highlight uppercase words with color
+    if (/[А-ЯA-Z]{3,}/.test(line) && !/^\s*$/.test(line)) {
+      ctx.fillStyle = accentColor;
+      ctx.font = 'bold 17px monospace';
+    } else {
+      ctx.fillStyle = '#FFF';
+      ctx.font = '15px monospace';
+    }
+    ctx.fillText(line, CANVAS_WIDTH / 2, startY + i * lineHeight);
+  });
+
+  // Continue prompt (bottom)
+  const blink = Math.sin(Date.now() * 0.005) > 0;
+  if (blink) {
+    ctx.fillStyle = accentColor;
+    ctx.font = 'bold 12px "Press Start 2P", monospace';
+    const promptText = page < totalPages - 1
+      ? '▶ TAP / SPACE — CONTINUE'
+      : '▶ TAP / SPACE — BEGIN';
+    ctx.fillText(promptText, CANVAS_WIDTH / 2, CANVAS_HEIGHT - 30);
+  }
+
+  ctx.textAlign = 'left';
+}
+
+function drawGameOverScreen(ctx: CanvasRenderingContext2D, state: GameState) {
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  bgGrad.addColorStop(0, '#1a0000');
+  bgGrad.addColorStop(1, '#000');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  ctx.fillStyle = '#FF1744';
+  ctx.font = 'bold 48px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('💀 GAME OVER 💀', CANVAS_WIDTH / 2, 180);
+
+  ctx.fillStyle = '#FFF';
+  ctx.font = '18px "Press Start 2P", monospace';
+  ctx.fillText(`LEVEL ${state.currentLevel}`, CANVAS_WIDTH / 2, 240);
+
+  ctx.fillStyle = '#FFD700';
+  ctx.font = '16px "Press Start 2P", monospace';
+  ctx.fillText(`SCORE: ${state.score}`, CANVAS_WIDTH / 2, 285);
+
+  const blink = Math.sin(Date.now() * 0.005) > 0;
+  if (blink) {
+    ctx.fillStyle = '#4CAF50';
     ctx.font = 'bold 16px "Press Start 2P", monospace';
-    ctx.fillText('Press SPACE / Tap to start!', CANVAS_WIDTH / 2, 440);
+    ctx.fillText('Press SPACE / Tap to retry', CANVAS_WIDTH / 2, 380);
   }
 
   ctx.textAlign = 'left';
@@ -893,7 +1296,6 @@ function drawStartScreen(ctx: CanvasRenderingContext2D) {
 export function renderMobileControls(ctx: CanvasRenderingContext2D, isFullscreen: boolean = false) {
   ctx.save();
 
-  // Movement/Jump buttons — moved UP to avoid clipping
   const btnY = CANVAS_HEIGHT - 75;
   const btnR = 40;
 
@@ -953,7 +1355,7 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D, isFullscreen
   ctx.font = 'bold 10px monospace';
   ctx.fillText('x2 = ↑↑', jumpX, btnY + 12);
 
-  // FULLSCREEN toggle (top-right, near HUD)
+  // FULLSCREEN toggle
   ctx.globalAlpha = 0.7;
   ctx.fillStyle = '#000';
   ctx.beginPath();
@@ -970,7 +1372,6 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D, isFullscreen
   ctx.font = 'bold 22px Arial';
   ctx.fillText('⛶', CANVAS_WIDTH - 30, 27);
 
-  // Optional: little hint next to it
   if (!isFullscreen) {
     ctx.globalAlpha = 0.7;
     ctx.fillStyle = '#FFF';
