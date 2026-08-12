@@ -26,11 +26,9 @@ export function loadImages() {
 export function render(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.save();
 
-  // Clear
   ctx.fillStyle = '#4a90d9';
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // Background gradient sky
   const skyGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   skyGrad.addColorStop(0, '#1a1a4e');
   skyGrad.addColorStop(0.3, '#4a90d9');
@@ -39,7 +37,6 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.fillStyle = skyGrad;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // Background image (parallax) — stretched to full canvas
   if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
     const imgRatio = bgImage.naturalWidth / bgImage.naturalHeight;
     const canvasRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
@@ -67,43 +64,35 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
     ctx.globalAlpha = 1;
   }
 
-  // Draw clouds
   drawClouds(ctx, state.clouds, state.cameraX);
 
-  // Camera transform
   ctx.save();
   ctx.translate(-state.cameraX, 0);
 
-  // Draw platforms
   for (const p of state.platforms) {
     drawPlatform(ctx, p);
   }
 
-  // Draw beer cans
   for (const beer of state.beers) {
     if (!beer.collected) {
       drawBeer(ctx, beer, state.time);
     }
   }
 
-  // Draw enemies
   for (const enemy of state.enemies) {
     if (enemy.alive) {
       drawEnemy(ctx, enemy);
     }
   }
 
-  // Draw particles
   for (const p of state.particles) {
     drawParticle(ctx, p);
   }
 
-  // Draw player
   drawPlayer(ctx, state.player);
 
   ctx.restore();
 
-  // UI overlay
   drawUI(ctx, state);
 
   ctx.restore();
@@ -179,7 +168,6 @@ function drawBeer(ctx: CanvasRenderingContext2D, beer: BeerCan, time: number) {
   const bobY = Math.sin(time * 0.05 + beer.bobOffset) * 5;
   const drawY = beer.y + bobY;
 
-  // Glow effect BEHIND the can
   ctx.save();
   ctx.globalAlpha = 0.2 + Math.sin(time * 0.1) * 0.1;
   ctx.shadowColor = '#FFD700';
@@ -218,7 +206,7 @@ function drawBeer(ctx: CanvasRenderingContext2D, beer: BeerCan, time: number) {
     ctx.fillStyle = '#FFD700';
     ctx.font = 'bold 7px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('AMBER', beer.x + beer.width / 2, drawY + 24);
+    ctx.fillText('AMBIR', beer.x + beer.width / 2, drawY + 24);
     ctx.fillText('LAND', beer.x + beer.width / 2, drawY + 31);
     ctx.textAlign = 'left';
 
@@ -469,7 +457,7 @@ function drawStartScreen(ctx: CanvasRenderingContext2D) {
 
   ctx.fillStyle = '#FFD700';
   ctx.font = 'bold 20px "Press Start 2P", monospace';
-  ctx.fillText('AMBERLAND HUNTER', CANVAS_WIDTH / 2, 140);
+  ctx.fillText('AMBIRLAND HUNTER', CANVAS_WIDTH / 2, 140);
 
   ctx.fillStyle = '#fff';
   ctx.font = '14px monospace';
@@ -502,7 +490,6 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D) {
   const btnY = CANVAS_HEIGHT - 65;
   const btnR = 45;
 
-  // ==== LEFT BUTTON ====
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#000';
   ctx.beginPath();
@@ -523,7 +510,6 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D) {
   ctx.textBaseline = 'middle';
   ctx.fillText('◀', 85, btnY);
 
-  // ==== RIGHT BUTTON ====
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#000';
   ctx.beginPath();
@@ -542,7 +528,6 @@ export function renderMobileControls(ctx: CanvasRenderingContext2D) {
   ctx.font = 'bold 36px Arial';
   ctx.fillText('▶', 225, btnY);
 
-  // ==== JUMP BUTTON (right side, bigger) ====
   const jumpX = CANVAS_WIDTH - 90;
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#4CAF50';
