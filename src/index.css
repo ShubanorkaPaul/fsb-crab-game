@@ -26,3 +26,77 @@ canvas {
 canvas:focus {
   outline: none;
 }
+
+/* === Rotate device warning for mobile portrait === */
+.rotate-warning {
+  display: none;
+}
+
+@media only screen and (max-width: 900px) and (orientation: portrait) {
+  .rotate-warning {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: linear-gradient(135deg, #0a0a1e 0%, #1a1a4e 50%, #2a1a4e 100%);
+    color: #FFD700;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px;
+    font-family: 'Press Start 2P', monospace;
+  }
+
+  .rotate-warning .phone-icon {
+    font-size: 90px;
+    animation: rotatePhone 2.5s ease-in-out infinite;
+    margin-bottom: 30px;
+    display: inline-block;
+    transform-origin: center;
+    filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.5));
+  }
+
+  .rotate-warning h2 {
+    font-size: 20px;
+    color: #FF8C00;
+    margin-bottom: 20px;
+    text-shadow: 3px 3px 0 #000, 0 0 20px rgba(255, 140, 0, 0.5);
+    line-height: 1.5;
+    letter-spacing: 2px;
+  }
+
+  .rotate-warning p {
+    font-size: 13px;
+    color: #FFD700;
+    line-height: 1.7;
+    max-width: 300px;
+    margin: 0 auto;
+    font-family: monospace;
+    letter-spacing: 1px;
+  }
+
+  .rotate-warning .crab {
+    font-size: 60px;
+    margin-top: 40px;
+    animation: bounceCrab 1.5s ease-in-out infinite;
+  }
+
+  /* Hide everything else while showing warning */
+  #root > *:not(.rotate-warning) {
+    display: none !important;
+  }
+}
+
+@keyframes rotatePhone {
+  0%   { transform: rotate(0deg); }
+  30%  { transform: rotate(0deg); }
+  60%  { transform: rotate(-90deg); }
+  90%  { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes bounceCrab {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-15px) scale(1.1); }
+}
