@@ -30,7 +30,7 @@ export interface BeerCan extends Rect {
 }
 
 export interface Platform extends Rect {
-  type: 'ground' | 'brick' | 'pipe';
+  type: 'ground' | 'brick' | 'pipe' | 'bar' | 'barrel';
 }
 
 export type EnemyType = 'bottle' | 'rat' | 'crow' | 'mine' | 'ninja';
@@ -42,10 +42,12 @@ export interface Enemy extends Rect {
   type: EnemyType;
   animFrame: number;
   animTimer: number;
-  baseY: number;      // for flying pattern
-  jumpTimer: number;  // for ninja
-  exploded: boolean;  // for mine
+  baseY: number;
+  jumpTimer: number;
+  exploded: boolean;
 }
+
+export type BossType = 'general' | 'elder';
 
 export interface Boss extends Rect {
   vx: number;
@@ -59,14 +61,17 @@ export interface Boss extends Rect {
   invulnTimer: number;
   arenaLeft: number;
   arenaRight: number;
-  phase: number;     // 1, 2, 3 — gets angrier
-  active: boolean;   // becomes true when player reaches arena
+  phase: number;
+  active: boolean;
+  type: BossType;
 }
+
+export type ProjectileType = 'document' | 'poop' | 'bowl' | 'genie';
 
 export interface Projectile extends Rect {
   vx: number;
   vy: number;
-  type: 'document' | 'poop';
+  type: ProjectileType;
   rotation: number;
   alive: boolean;
 }
@@ -82,7 +87,20 @@ export interface Particle {
   size: number;
 }
 
+// Game screens for story flow
+export type Screen =
+  | 'menu'
+  | 'prologue'      // shown once before level 1
+  | 'level1'
+  | 'interlude'     // between L1 and L2
+  | 'level2'
+  | 'finale'        // final story after L2
+  | 'gameOver';
+
 export interface GameState {
+  screen: Screen;
+  currentLevel: 1 | 2;
+
   player: Player;
   beers: BeerCan[];
   platforms: Platform[];
@@ -98,6 +116,9 @@ export interface GameState {
   gameStarted: boolean;
   time: number;
   clouds: Cloud[];
+
+  // Story text page index (for prologue/interlude/finale)
+  storyPage: number;
 }
 
 export interface Cloud {
