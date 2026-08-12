@@ -1102,7 +1102,6 @@ function drawUI(ctx: CanvasRenderingContext2D, state: GameState) {
 }
 
 function drawMenuScreen(ctx: CanvasRenderingContext2D) {
-  // Background gradient
   const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   bgGrad.addColorStop(0, '#0a0a1e');
   bgGrad.addColorStop(0.5, '#1a0a2e');
@@ -1110,13 +1109,11 @@ function drawMenuScreen(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // Neon red glow at top
   const time = Date.now();
   const pulse = 0.5 + 0.5 * Math.sin(time * 0.002);
   ctx.fillStyle = `rgba(255, 30, 60, ${0.08 + pulse * 0.05})`;
   ctx.fillRect(0, 0, CANVAS_WIDTH, 100);
 
-  // Title
   ctx.save();
   ctx.shadowColor = '#FF3D00';
   ctx.shadowBlur = 20;
@@ -1126,13 +1123,11 @@ function drawMenuScreen(ctx: CanvasRenderingContext2D) {
   ctx.fillText('🦀 ФСБ КРАБ 🦀', CANVAS_WIDTH / 2, 75);
   ctx.restore();
 
-  // Subtitle
   ctx.fillStyle = '#FFD700';
   ctx.font = 'bold 20px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.fillText('ОХОТНИК ЗА AMBIRLAND', CANVAS_WIDTH / 2, 115);
 
-  // Divider
   ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -1140,7 +1135,6 @@ function drawMenuScreen(ctx: CanvasRenderingContext2D) {
   ctx.lineTo(CANVAS_WIDTH - 150, 135);
   ctx.stroke();
 
-  // Story teaser
   ctx.fillStyle = '#FFF';
   ctx.font = '13px monospace';
   ctx.textAlign = 'center';
@@ -1155,7 +1149,6 @@ function drawMenuScreen(ctx: CanvasRenderingContext2D) {
     ctx.fillText(line, CANVAS_WIDTH / 2, 165 + i * 20);
   });
 
-  // Level 1
   ctx.fillStyle = '#FF8C00';
   ctx.font = 'bold 12px "Press Start 2P", monospace';
   ctx.fillText('УРОВЕНЬ 1 — КАБИНЕТ 14', CANVAS_WIDTH / 2, 295);
@@ -1163,7 +1156,6 @@ function drawMenuScreen(ctx: CanvasRenderingContext2D) {
   ctx.font = '11px monospace';
   ctx.fillText('Босс: Толстый Генерал', CANVAS_WIDTH / 2, 313);
 
-  // Level 2
   ctx.fillStyle = '#9C27B0';
   ctx.font = 'bold 12px "Press Start 2P", monospace';
   ctx.fillText('УРОВЕНЬ 2 — БАР "13 RULES"', CANVAS_WIDTH / 2, 340);
@@ -1171,13 +1163,11 @@ function drawMenuScreen(ctx: CanvasRenderingContext2D) {
   ctx.font = '11px monospace';
   ctx.fillText('Босс: Туркменский Старец', CANVAS_WIDTH / 2, 358);
 
-  // Controls
   ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
   ctx.font = '10px monospace';
   ctx.fillText('← → или A/D — идти  |  ↑ / SPACE — прыжок  (х2 — двойной)', CANVAS_WIDTH / 2, 390);
   ctx.fillText('На телефоне: жми ⛶ для полного экрана', CANVAS_WIDTH / 2, 407);
 
-  // Blinking start prompt
   const blink = Math.sin(time * 0.005) > 0;
   if (blink) {
     ctx.save();
@@ -1263,21 +1253,27 @@ function drawGameOverScreen(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.fillStyle = '#FF1744';
   ctx.font = 'bold 44px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('💀 ИГРА ОКОНЧЕНА 💀', CANVAS_WIDTH / 2, 180);
+  ctx.fillText('💀 ИГРА ОКОНЧЕНА 💀', CANVAS_WIDTH / 2, 170);
 
   ctx.fillStyle = '#FFF';
   ctx.font = '18px "Press Start 2P", monospace';
-  ctx.fillText(`УРОВЕНЬ ${state.currentLevel}`, CANVAS_WIDTH / 2, 240);
+  const levelName = state.currentLevel === 1 ? 'КАБИНЕТ 14' : 'БАР "13 RULES"';
+  ctx.fillText(`УРОВЕНЬ ${state.currentLevel}: ${levelName}`, CANVAS_WIDTH / 2, 225);
 
   ctx.fillStyle = '#FFD700';
   ctx.font = '16px "Press Start 2P", monospace';
-  ctx.fillText(`ОЧКИ: ${state.score}`, CANVAS_WIDTH / 2, 285);
+  ctx.fillText(`ОЧКИ: ${state.score}`, CANVAS_WIDTH / 2, 265);
+
+  ctx.fillStyle = '#AAA';
+  ctx.font = '12px monospace';
+  ctx.fillText('Ты попробуешь пройти этот же уровень заново.', CANVAS_WIDTH / 2, 320);
+  ctx.fillText('Прогресс уровня начнётся сначала.', CANVAS_WIDTH / 2, 340);
 
   const blink = Math.sin(Date.now() * 0.005) > 0;
   if (blink) {
     ctx.fillStyle = '#4CAF50';
     ctx.font = 'bold 16px "Press Start 2P", monospace';
-    ctx.fillText('SPACE / TAP — начать сначала', CANVAS_WIDTH / 2, 380);
+    ctx.fillText('▶ SPACE / TAP — ПОПРОБОВАТЬ СНОВА', CANVAS_WIDTH / 2, 410);
   }
 
   ctx.textAlign = 'left';
