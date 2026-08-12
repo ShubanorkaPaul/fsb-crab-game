@@ -2,8 +2,9 @@
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 500;
 
-export const GRAVITY = 0.6;
-export const JUMP_FORCE = -13;
+export const GRAVITY = 0.55;
+export const JUMP_FORCE = -15;          // было -13, стало выше
+export const DOUBLE_JUMP_FORCE = -12;   // сила второго прыжка
 export const MOVE_SPEED = 5;
 export const MAX_FALL_SPEED = 12;
 
