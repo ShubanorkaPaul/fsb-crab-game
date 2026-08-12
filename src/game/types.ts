@@ -18,6 +18,8 @@ export interface Player extends Rect {
   animFrame: number;
   animTimer: number;
   isJumping: boolean;
+  jumpsUsed: number;
+  jumpKeyHeld: boolean;
 }
 
 export interface BeerCan extends Rect {
