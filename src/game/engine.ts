@@ -20,8 +20,6 @@ import {
   STORY_FINALE,
 } from './constants';
 
-// Module-level flag: whether the menu-space key press has been consumed already.
-// Prevents multiple story pages skipping per single tap.
 let menuInputConsumed = false;
 
 export function createInitialState(): GameState {
@@ -66,6 +64,51 @@ function makePlayer() {
   };
 }
 
+/**
+ * Restart level from the beginning (used after death).
+ * Keeps overall progress (current level, cumulative score if desired),
+ * but resets everything else.
+ */
+function restartCurrentLevel(state: GameState): GameState {
+  if (state.currentLevel === 1) {
+    return {
+      ...state,
+      screen: 'level1',
+      player: makePlayer(),
+      beers: createBeers(),
+      platforms: createPlatforms(),
+      enemies: createEnemies(),
+      boss: createBoss(),
+      projectiles: [],
+      particles: [],
+      cameraX: 0,
+      lives: 3,
+      score: 0,          // Score resets on death for the current level
+      gameOver: false,
+      gameWon: false,
+      gameStarted: true,
+    };
+  } else {
+    return {
+      ...state,
+      screen: 'level2',
+      player: makePlayer(),
+      beers: createBeersL2(),
+      platforms: createPlatformsL2(),
+      enemies: createEnemiesL2(),
+      boss: createBossL2(),
+      projectiles: [],
+      particles: [],
+      cameraX: 0,
+      lives: 3,
+      score: 0,          // Score resets — but you keep your unlocked level!
+      gameOver: false,
+      gameWon: false,
+      gameStarted: true,
+    };
+  }
+}
+
 function loadLevel1(state: GameState): GameState {
   return {
     ...state,
@@ -104,24 +147,16 @@ function loadLevel2(state: GameState): GameState {
   };
 }
 
-/**
- * Menu-style input.
- * Only fires on the FRAME the space/tap key transitions from up→down.
- * Uses `menuInputConsumed` to prevent multi-fire while held.
- */
 function handleMenuInput(state: GameState, keys: Keys): GameState {
-  // Reset consumed flag when key is released
   if (!keys.space) {
     menuInputConsumed = false;
     return { ...state, time: state.time + 1 };
   }
 
-  // If already consumed this key-press, ignore
   if (menuInputConsumed) {
     return { ...state, time: state.time + 1 };
   }
 
-  // Consume this key-press so it only counts once
   menuInputConsumed = true;
 
   switch (state.screen) {
@@ -147,15 +182,15 @@ function handleMenuInput(state: GameState, keys: Keys): GameState {
     case 'finale': {
       const nextPage = state.storyPage + 1;
       if (nextPage >= STORY_FINALE.length) {
-        return { ...createInitialState(), score: state.score };
+        // Full restart back to menu
+        return createInitialState();
       }
       return { ...state, storyPage: nextPage, time: state.time + 1 };
     }
 
     case 'gameOver':
-      return state.currentLevel === 1
-        ? { ...loadLevel1(state), lives: 3, score: 0 }
-        : { ...loadLevel2(state), lives: 3, score: 0 };
+      // Restart CURRENT level, not the whole game!
+      return restartCurrentLevel(state);
 
     default:
       return { ...state, time: state.time + 1 };
@@ -173,7 +208,6 @@ export function update(state: GameState, keys: Keys): GameState {
     return handleMenuInput(state, keys);
   }
 
-  // In gameplay — reset the menu-input consumed flag so it's fresh next time
   menuInputConsumed = false;
 
   const newState = { ...state, time: state.time + 1 };
