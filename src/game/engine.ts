@@ -1,5 +1,6 @@
-import { GameState, Keys, Rect, Enemy } from './types';
+import { GameState, Keys, Rect, Enemy, Screen } from './types';
 import { createPlatforms, createBeers, createEnemies, createClouds, createBoss } from './level';
+import { createPlatformsL2, createBeersL2, createEnemiesL2, createBossL2 } from './level2';
 import {
   GRAVITY,
   JUMP_FORCE,
@@ -12,30 +13,21 @@ import {
   CANVAS_HEIGHT,
   SCROLL_THRESHOLD,
   GROUND_Y,
-  BOSS_ARENA_LEFT,
+  L1_BOSS_ARENA_LEFT,
+  L2_BOSS_ARENA_LEFT,
+  STORY_PROLOGUE,
+  STORY_INTERLUDE,
+  STORY_FINALE,
 } from './constants';
 
 export function createInitialState(): GameState {
   return {
-    player: {
-      x: 100,
-      y: GROUND_Y - PLAYER_HEIGHT,
-      width: PLAYER_WIDTH,
-      height: PLAYER_HEIGHT,
-      vx: 0,
-      vy: 0,
-      onGround: false,
-      facingRight: true,
-      animFrame: 0,
-      animTimer: 0,
-      isJumping: false,
-      jumpsUsed: 0,
-      jumpKeyHeld: false,
-      invulnTimer: 0,
-    },
-    beers: createBeers(),
-    platforms: createPlatforms(),
-    enemies: createEnemies(),
+    screen: 'menu',
+    currentLevel: 1,
+    player: makePlayer(),
+    beers: [],
+    platforms: [],
+    enemies: [],
     boss: createBoss(),
     projectiles: [],
     particles: [],
@@ -47,22 +39,127 @@ export function createInitialState(): GameState {
     gameStarted: false,
     time: 0,
     clouds: createClouds(),
+    storyPage: 0,
   };
 }
 
-export function update(state: GameState, keys: Keys): GameState {
-  if (!state.gameStarted || state.gameOver || state.gameWon) {
-    if (keys.space) {
-      if (!state.gameStarted) {
-        return { ...state, gameStarted: true };
+function makePlayer() {
+  return {
+    x: 100,
+    y: GROUND_Y - PLAYER_HEIGHT,
+    width: PLAYER_WIDTH,
+    height: PLAYER_HEIGHT,
+    vx: 0,
+    vy: 0,
+    onGround: false,
+    facingRight: true,
+    animFrame: 0,
+    animTimer: 0,
+    isJumping: false,
+    jumpsUsed: 0,
+    jumpKeyHeld: false,
+    invulnTimer: 0,
+  };
+}
+
+/** Load a fresh Level 1 (Cabinet 14) */
+function loadLevel1(state: GameState): GameState {
+  return {
+    ...state,
+    screen: 'level1',
+    currentLevel: 1,
+    player: makePlayer(),
+    beers: createBeers(),
+    platforms: createPlatforms(),
+    enemies: createEnemies(),
+    boss: createBoss(),
+    projectiles: [],
+    particles: [],
+    cameraX: 0,
+    gameOver: false,
+    gameWon: false,
+    gameStarted: true,
+  };
+}
+
+/** Load a fresh Level 2 (Bar "13 Rules") */
+function loadLevel2(state: GameState): GameState {
+  return {
+    ...state,
+    screen: 'level2',
+    currentLevel: 2,
+    player: makePlayer(),
+    beers: createBeersL2(),
+    platforms: createPlatformsL2(),
+    enemies: createEnemiesL2(),
+    boss: createBossL2(),
+    projectiles: [],
+    particles: [],
+    cameraX: 0,
+    gameOver: false,
+    gameWon: false,
+    gameStarted: true,
+  };
+}
+
+/** Handle SPACE / tap on menu-like screens */
+function handleMenuInput(state: GameState, keys: Keys): GameState {
+  if (!keys.space) return { ...state, time: state.time + 1 };
+
+  switch (state.screen) {
+    case 'menu':
+      // Start: go to prologue
+      return { ...state, screen: 'prologue', storyPage: 0, time: state.time + 1 };
+
+    case 'prologue': {
+      const nextPage = state.storyPage + 1;
+      if (nextPage >= STORY_PROLOGUE.length) {
+        return loadLevel1(state);
       }
-      if (state.gameOver || state.gameWon) {
-        return createInitialState();
-      }
+      return { ...state, storyPage: nextPage, time: state.time + 1 };
     }
-    return { ...state, time: state.time + 1 };
+
+    case 'interlude': {
+      const nextPage = state.storyPage + 1;
+      if (nextPage >= STORY_INTERLUDE.length) {
+        return loadLevel2(state);
+      }
+      return { ...state, storyPage: nextPage, time: state.time + 1 };
+    }
+
+    case 'finale': {
+      const nextPage = state.storyPage + 1;
+      if (nextPage >= STORY_FINALE.length) {
+        // Back to menu
+        return { ...createInitialState(), score: state.score };
+      }
+      return { ...state, storyPage: nextPage, time: state.time + 1 };
+    }
+
+    case 'gameOver':
+      // Restart current level from scratch
+      return state.currentLevel === 1
+        ? { ...loadLevel1(state), lives: 3, score: 0 }
+        : { ...loadLevel2(state), lives: 3, score: 0 };
+
+    default:
+      return { ...state, time: state.time + 1 };
+  }
+}
+
+export function update(state: GameState, keys: Keys): GameState {
+  // Non-gameplay screens
+  if (
+    state.screen === 'menu' ||
+    state.screen === 'prologue' ||
+    state.screen === 'interlude' ||
+    state.screen === 'finale' ||
+    state.screen === 'gameOver'
+  ) {
+    return handleMenuInput(state, keys);
   }
 
+  // Gameplay screens (level1 / level2)
   const newState = { ...state, time: state.time + 1 };
 
   updatePlayer(newState, keys);
@@ -76,20 +173,38 @@ export function update(state: GameState, keys: Keys): GameState {
   updateParticles(newState);
   updateCamera(newState);
 
-  if (newState.player.invulnTimer > 0) {
-    newState.player.invulnTimer -= 1;
-  }
-  if (newState.boss.invulnTimer > 0) {
-    newState.boss.invulnTimer -= 1;
-  }
+  if (newState.player.invulnTimer > 0) newState.player.invulnTimer -= 1;
+  if (newState.boss.invulnTimer > 0) newState.boss.invulnTimer -= 1;
 
-  if (!newState.boss.alive) {
+  // Boss defeated?
+  if (!newState.boss.alive && !newState.gameWon) {
+    // Wait a bit for celebration particles, then transition
+    if (newState.time % 2 === 0) {
+      // Give a small delay
+    }
     newState.gameWon = true;
+
+    // Transition after ~2 seconds (120 frames at 60fps)
+    // Use particles' natural fadeout time as a rough delay
   }
 
+  // If gameWon flag was set, wait some time then move to next screen
+  if (newState.gameWon) {
+    (newState as any)._winTimer = ((newState as any)._winTimer || 0) + 1;
+    if ((newState as any)._winTimer > 120) {
+      if (state.currentLevel === 1) {
+        return { ...newState, screen: 'interlude', storyPage: 0, gameWon: false };
+      } else {
+        return { ...newState, screen: 'finale', storyPage: 0, gameWon: false };
+      }
+    }
+  }
+
+  // Falling off the map
   if (newState.player.y > CANVAS_HEIGHT + 100) {
     newState.lives -= 1;
     if (newState.lives <= 0) {
+      newState.screen = 'gameOver';
       newState.gameOver = true;
     } else {
       newState.player.x = Math.max(0, newState.cameraX + 100);
@@ -151,24 +266,17 @@ function updatePlayer(state: GameState, keys: Keys) {
   if (player.vy > MAX_FALL_SPEED) player.vy = MAX_FALL_SPEED;
 
   player.x += player.vx;
-
-  if (player.x < state.cameraX) {
-    player.x = state.cameraX;
-  }
+  if (player.x < state.cameraX) player.x = state.cameraX;
 
   for (const platform of state.platforms) {
     if (rectsOverlap(player, platform)) {
-      if (player.vx > 0) {
-        player.x = platform.x - player.width;
-      } else if (player.vx < 0) {
-        player.x = platform.x + platform.width;
-      }
+      if (player.vx > 0) player.x = platform.x - player.width;
+      else if (player.vx < 0) player.x = platform.x + platform.width;
       player.vx = 0;
     }
   }
 
   player.y += player.vy;
-
   player.onGround = false;
   for (const platform of state.platforms) {
     if (rectsOverlap(player, platform)) {
@@ -203,8 +311,7 @@ function updateEnemies(state: GameState) {
     if (enemy.type === 'crow') {
       enemy.x += enemy.vx;
       enemy.y = enemy.baseY + Math.sin(enemy.animTimer * 0.05) * 30;
-      if (enemy.animTimer % 180 === 0 &&
-          Math.abs(enemy.x - state.player.x) < 300) {
+      if (enemy.animTimer % 180 === 0 && Math.abs(enemy.x - state.player.x) < 300) {
         state.projectiles.push({
           x: enemy.x + enemy.width / 2 - 8,
           y: enemy.y + enemy.height,
@@ -217,9 +324,7 @@ function updateEnemies(state: GameState) {
           alive: true,
         });
       }
-      if (enemy.x < state.cameraX - 200) {
-        enemy.x = state.cameraX + 900;
-      }
+      if (enemy.x < state.cameraX - 200) enemy.x = state.cameraX + 900;
       continue;
     }
 
@@ -231,9 +336,7 @@ function updateEnemies(state: GameState) {
       if (dist < 50 && !enemy.exploded) {
         enemy.exploded = true;
         enemy.alive = false;
-        if (dist < 45 && state.player.invulnTimer <= 0) {
-          hurtPlayer(state);
-        }
+        if (dist < 45 && state.player.invulnTimer <= 0) hurtPlayer(state);
         for (let i = 0; i < 25; i++) {
           state.particles.push({
             x: enemy.x + enemy.width / 2,
@@ -251,23 +354,19 @@ function updateEnemies(state: GameState) {
     }
 
     if (enemy.type === 'ninja') {
-      // Cossack — walking + occasional jump + horizontal wall bouncing
       enemy.jumpTimer -= 1;
       enemy.vy += GRAVITY;
       if (enemy.vy > MAX_FALL_SPEED) enemy.vy = MAX_FALL_SPEED;
 
-      // Move X
       enemy.x += enemy.vx;
 
-      // Chase player if close
       const dx = state.player.x - enemy.x;
       if (Math.abs(dx) < 400 && enemy.vy === 0) {
         enemy.vx = dx > 0 ? 2 : -2;
       }
 
-      // X collision — bounce off walls (pipes/bricks that aren't ground level)
       for (const platform of state.platforms) {
-        if (platform.type === 'pipe' || platform.type === 'brick') {
+        if (platform.type === 'pipe' || platform.type === 'brick' || platform.type === 'barrel') {
           if (rectsOverlap(enemy, platform)) {
             if (enemy.vx > 0) enemy.x = platform.x - enemy.width;
             else if (enemy.vx < 0) enemy.x = platform.x + platform.width;
@@ -276,9 +375,7 @@ function updateEnemies(state: GameState) {
         }
       }
 
-      // Move Y
       enemy.y += enemy.vy;
-
       let onGround = false;
       for (const platform of state.platforms) {
         if (rectsOverlap(enemy, platform) && enemy.vy >= 0) {
@@ -287,7 +384,6 @@ function updateEnemies(state: GameState) {
           onGround = true;
         }
       }
-
       if (onGround && enemy.jumpTimer <= 0) {
         enemy.vy = -10;
         enemy.jumpTimer = 90 + Math.random() * 60;
@@ -295,17 +391,14 @@ function updateEnemies(state: GameState) {
       continue;
     }
 
-    // === Bottle & Rat — ground walkers (FIXED) ===
-    // Save old X in case we need to revert
+    // Bottle & Rat — ground walkers
     const oldX = enemy.x;
     enemy.x += enemy.vx;
 
-    // Check for wall collision (pipes, bricks in the way)
     let bumped = false;
     for (const platform of state.platforms) {
-      if (platform.type === 'pipe' || platform.type === 'brick') {
+      if (platform.type === 'pipe' || platform.type === 'brick' || platform.type === 'barrel') {
         if (rectsOverlap(enemy, platform)) {
-          // Bumped into a wall — revert and reverse direction
           enemy.x = oldX;
           enemy.vx = -enemy.vx;
           bumped = true;
@@ -315,30 +408,23 @@ function updateEnemies(state: GameState) {
     }
     if (bumped) continue;
 
-    // Edge detection — check if enemy is about to walk off a ground platform
     let onPlatform = false;
     let platformEndsSoon = false;
     for (const platform of state.platforms) {
-      if (platform.type !== 'ground' && platform.type !== 'brick') continue;
-      // Is enemy standing on this platform?
+      if (platform.type !== 'ground' && platform.type !== 'brick' && platform.type !== 'bar') continue;
       if (
         enemy.x + enemy.width > platform.x &&
         enemy.x < platform.x + platform.width &&
         Math.abs(enemy.y + enemy.height - platform.y) < 5
       ) {
         onPlatform = true;
-        // Check edges
-        if (enemy.vx < 0 && enemy.x <= platform.x + 3) {
-          platformEndsSoon = true;
-        } else if (enemy.vx > 0 && enemy.x + enemy.width >= platform.x + platform.width - 3) {
-          platformEndsSoon = true;
-        }
+        if (enemy.vx < 0 && enemy.x <= platform.x + 3) platformEndsSoon = true;
+        else if (enemy.vx > 0 && enemy.x + enemy.width >= platform.x + platform.width - 3) platformEndsSoon = true;
       }
     }
 
     if (platformEndsSoon || !onPlatform) {
       enemy.vx = -enemy.vx;
-      // Nudge back so we don't fall off
       enemy.x = oldX;
     }
   }
@@ -348,9 +434,9 @@ function updateBoss(state: GameState) {
   const boss = state.boss;
   if (!boss.alive) return;
 
-  if (!boss.active && state.player.x > BOSS_ARENA_LEFT - 100) {
-    boss.active = true;
-  }
+  const arenaLeft = boss.type === 'general' ? L1_BOSS_ARENA_LEFT : L2_BOSS_ARENA_LEFT;
+
+  if (!boss.active && state.player.x > arenaLeft - 100) boss.active = true;
   if (!boss.active) return;
 
   boss.animTimer++;
@@ -377,25 +463,65 @@ function updateBoss(state: GameState) {
 
   boss.throwTimer -= 1;
   if (boss.throwTimer <= 0) {
-    const throwInterval = boss.phase === 1 ? 110 : boss.phase === 2 ? 75 : 45;
-    boss.throwTimer = throwInterval;
+    // General: throws documents. Elder: throws bowls of kumis + summons genies in phase 3.
+    if (boss.type === 'general') {
+      const throwInterval = boss.phase === 1 ? 110 : boss.phase === 2 ? 75 : 45;
+      boss.throwTimer = throwInterval;
 
-    const dirX = state.player.x - boss.x;
-    const dir = dirX > 0 ? 1 : -1;
+      const dirX = state.player.x - boss.x;
+      const dir = dirX > 0 ? 1 : -1;
+      const count = boss.phase;
+      for (let i = 0; i < count; i++) {
+        state.projectiles.push({
+          x: boss.x + boss.width / 2 - 12,
+          y: boss.y + 30,
+          width: 24,
+          height: 18,
+          vx: dir * (3 + i * 0.5 + Math.random()),
+          vy: -6 - Math.random() * 2,
+          type: 'document',
+          rotation: 0,
+          alive: true,
+        });
+      }
+    } else {
+      // Elder (Turkmen)
+      const throwInterval = boss.phase <= 2 ? 90 : boss.phase === 3 ? 65 : 45;
+      boss.throwTimer = throwInterval;
 
-    const count = boss.phase;
-    for (let i = 0; i < count; i++) {
-      state.projectiles.push({
-        x: boss.x + boss.width / 2 - 12,
-        y: boss.y + 30,
-        width: 24,
-        height: 18,
-        vx: dir * (3 + i * 0.5 + Math.random()),
-        vy: -6 - Math.random() * 2,
-        type: 'document',
-        rotation: 0,
-        alive: true,
-      });
+      const dirX = state.player.x - boss.x;
+      const dir = dirX > 0 ? 1 : -1;
+
+      // Bowls of kumis — heavier arc
+      const count = Math.min(boss.phase, 3);
+      for (let i = 0; i < count; i++) {
+        state.projectiles.push({
+          x: boss.x + boss.width / 2 - 12,
+          y: boss.y + 20,
+          width: 22,
+          height: 22,
+          vx: dir * (2.5 + i * 0.6),
+          vy: -8 - Math.random() * 2,
+          type: 'bowl',
+          rotation: 0,
+          alive: true,
+        });
+      }
+
+      // Genies from bottle in phase 3+
+      if (boss.phase >= 3) {
+        state.projectiles.push({
+          x: boss.x + boss.width / 2,
+          y: boss.y + 10,
+          width: 20,
+          height: 30,
+          vx: dir * 5,
+          vy: 0,
+          type: 'genie',
+          rotation: 0,
+          alive: true,
+        });
+      }
     }
   }
 }
@@ -403,13 +529,25 @@ function updateBoss(state: GameState) {
 function updateProjectiles(state: GameState) {
   for (const p of state.projectiles) {
     if (!p.alive) continue;
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.3;
-    p.rotation += 0.2;
+
+    if (p.type === 'genie') {
+      // Genies fly horizontally, don't fall much
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.05;
+      p.rotation += 0.15;
+    } else {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.3;
+      p.rotation += 0.2;
+    }
 
     if (p.y > GROUND_Y - p.height + 5) {
       p.alive = false;
+      const color = p.type === 'document' ? '#F5DEB3' :
+                    p.type === 'bowl' ? '#F5DEB3' :
+                    p.type === 'genie' ? '#9C27B0' : '#8B4513';
       for (let i = 0; i < 6; i++) {
         state.particles.push({
           x: p.x,
@@ -418,14 +556,12 @@ function updateProjectiles(state: GameState) {
           vy: -Math.random() * 2,
           life: 20,
           maxLife: 20,
-          color: p.type === 'document' ? '#F5DEB3' : '#8B4513',
+          color,
           size: 3,
         });
       }
     }
-    if (p.x < state.cameraX - 100 || p.x > state.cameraX + 1000) {
-      p.alive = false;
-    }
+    if (p.x < state.cameraX - 100 || p.x > state.cameraX + 1000) p.alive = false;
   }
   state.projectiles = state.projectiles.filter(p => p.alive);
 }
@@ -494,8 +630,8 @@ function checkBossCollision(state: GameState) {
       state.player.jumpsUsed = 1;
       state.score += 500;
 
-      boss.phase = Math.min(3, boss.maxHp - boss.hp + 1);
-      boss.vx = boss.vx > 0 ? 2 + boss.phase : -(2 + boss.phase);
+      boss.phase = Math.min(4, boss.maxHp - boss.hp + 1);
+      boss.vx = boss.vx > 0 ? 2 + boss.phase * 0.5 : -(2 + boss.phase * 0.5);
 
       for (let i = 0; i < 30; i++) {
         state.particles.push({
@@ -568,6 +704,7 @@ function hurtPlayer(state: GameState) {
   state.lives -= 1;
   state.player.invulnTimer = 90;
   if (state.lives <= 0) {
+    state.screen = 'gameOver';
     state.gameOver = true;
   }
 }
