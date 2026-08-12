@@ -1,4 +1,4 @@
-import { GameState, Keys, Rect, Enemy, Screen } from './types';
+import { GameState, Keys, Rect, Enemy } from './types';
 import { createPlatforms, createBeers, createEnemies, createClouds, createBoss } from './level';
 import { createPlatformsL2, createBeersL2, createEnemiesL2, createBossL2 } from './level2';
 import {
@@ -19,6 +19,10 @@ import {
   STORY_INTERLUDE,
   STORY_FINALE,
 } from './constants';
+
+// Module-level flag: whether the menu-space key press has been consumed already.
+// Prevents multiple story pages skipping per single tap.
+let menuInputConsumed = false;
 
 export function createInitialState(): GameState {
   return {
@@ -62,7 +66,6 @@ function makePlayer() {
   };
 }
 
-/** Load a fresh Level 1 (Cabinet 14) */
 function loadLevel1(state: GameState): GameState {
   return {
     ...state,
@@ -82,7 +85,6 @@ function loadLevel1(state: GameState): GameState {
   };
 }
 
-/** Load a fresh Level 2 (Bar "13 Rules") */
 function loadLevel2(state: GameState): GameState {
   return {
     ...state,
@@ -102,13 +104,28 @@ function loadLevel2(state: GameState): GameState {
   };
 }
 
-/** Handle SPACE / tap on menu-like screens */
+/**
+ * Menu-style input.
+ * Only fires on the FRAME the space/tap key transitions from up→down.
+ * Uses `menuInputConsumed` to prevent multi-fire while held.
+ */
 function handleMenuInput(state: GameState, keys: Keys): GameState {
-  if (!keys.space) return { ...state, time: state.time + 1 };
+  // Reset consumed flag when key is released
+  if (!keys.space) {
+    menuInputConsumed = false;
+    return { ...state, time: state.time + 1 };
+  }
+
+  // If already consumed this key-press, ignore
+  if (menuInputConsumed) {
+    return { ...state, time: state.time + 1 };
+  }
+
+  // Consume this key-press so it only counts once
+  menuInputConsumed = true;
 
   switch (state.screen) {
     case 'menu':
-      // Start: go to prologue
       return { ...state, screen: 'prologue', storyPage: 0, time: state.time + 1 };
 
     case 'prologue': {
@@ -130,14 +147,12 @@ function handleMenuInput(state: GameState, keys: Keys): GameState {
     case 'finale': {
       const nextPage = state.storyPage + 1;
       if (nextPage >= STORY_FINALE.length) {
-        // Back to menu
         return { ...createInitialState(), score: state.score };
       }
       return { ...state, storyPage: nextPage, time: state.time + 1 };
     }
 
     case 'gameOver':
-      // Restart current level from scratch
       return state.currentLevel === 1
         ? { ...loadLevel1(state), lives: 3, score: 0 }
         : { ...loadLevel2(state), lives: 3, score: 0 };
@@ -148,7 +163,6 @@ function handleMenuInput(state: GameState, keys: Keys): GameState {
 }
 
 export function update(state: GameState, keys: Keys): GameState {
-  // Non-gameplay screens
   if (
     state.screen === 'menu' ||
     state.screen === 'prologue' ||
@@ -159,7 +173,9 @@ export function update(state: GameState, keys: Keys): GameState {
     return handleMenuInput(state, keys);
   }
 
-  // Gameplay screens (level1 / level2)
+  // In gameplay — reset the menu-input consumed flag so it's fresh next time
+  menuInputConsumed = false;
+
   const newState = { ...state, time: state.time + 1 };
 
   updatePlayer(newState, keys);
@@ -176,19 +192,10 @@ export function update(state: GameState, keys: Keys): GameState {
   if (newState.player.invulnTimer > 0) newState.player.invulnTimer -= 1;
   if (newState.boss.invulnTimer > 0) newState.boss.invulnTimer -= 1;
 
-  // Boss defeated?
   if (!newState.boss.alive && !newState.gameWon) {
-    // Wait a bit for celebration particles, then transition
-    if (newState.time % 2 === 0) {
-      // Give a small delay
-    }
     newState.gameWon = true;
-
-    // Transition after ~2 seconds (120 frames at 60fps)
-    // Use particles' natural fadeout time as a rough delay
   }
 
-  // If gameWon flag was set, wait some time then move to next screen
   if (newState.gameWon) {
     (newState as any)._winTimer = ((newState as any)._winTimer || 0) + 1;
     if ((newState as any)._winTimer > 120) {
@@ -200,7 +207,6 @@ export function update(state: GameState, keys: Keys): GameState {
     }
   }
 
-  // Falling off the map
   if (newState.player.y > CANVAS_HEIGHT + 100) {
     newState.lives -= 1;
     if (newState.lives <= 0) {
@@ -391,7 +397,6 @@ function updateEnemies(state: GameState) {
       continue;
     }
 
-    // Bottle & Rat — ground walkers
     const oldX = enemy.x;
     enemy.x += enemy.vx;
 
@@ -463,7 +468,6 @@ function updateBoss(state: GameState) {
 
   boss.throwTimer -= 1;
   if (boss.throwTimer <= 0) {
-    // General: throws documents. Elder: throws bowls of kumis + summons genies in phase 3.
     if (boss.type === 'general') {
       const throwInterval = boss.phase === 1 ? 110 : boss.phase === 2 ? 75 : 45;
       boss.throwTimer = throwInterval;
@@ -485,14 +489,11 @@ function updateBoss(state: GameState) {
         });
       }
     } else {
-      // Elder (Turkmen)
       const throwInterval = boss.phase <= 2 ? 90 : boss.phase === 3 ? 65 : 45;
       boss.throwTimer = throwInterval;
 
       const dirX = state.player.x - boss.x;
       const dir = dirX > 0 ? 1 : -1;
-
-      // Bowls of kumis — heavier arc
       const count = Math.min(boss.phase, 3);
       for (let i = 0; i < count; i++) {
         state.projectiles.push({
@@ -507,8 +508,6 @@ function updateBoss(state: GameState) {
           alive: true,
         });
       }
-
-      // Genies from bottle in phase 3+
       if (boss.phase >= 3) {
         state.projectiles.push({
           x: boss.x + boss.width / 2,
@@ -529,9 +528,7 @@ function updateBoss(state: GameState) {
 function updateProjectiles(state: GameState) {
   for (const p of state.projectiles) {
     if (!p.alive) continue;
-
     if (p.type === 'genie') {
-      // Genies fly horizontally, don't fall much
       p.x += p.vx;
       p.y += p.vy;
       p.vy += 0.05;
