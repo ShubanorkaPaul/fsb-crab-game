@@ -9,19 +9,26 @@ export const MAX_JUMPS = 2;
 export const MOVE_SPEED = 5;
 export const MAX_FALL_SPEED = 12;
 
-export const PLAYER_WIDTH = 90;
-export const PLAYER_HEIGHT = 90;
+export const PLAYER_WIDTH = 80;
+export const PLAYER_HEIGHT = 80;
 
-export const BEER_WIDTH = 65;
-export const BEER_HEIGHT = 80;
+export const BEER_WIDTH = 50;
+export const BEER_HEIGHT = 65;
 
 export const PLATFORM_HEIGHT = 20;
 
 export const GROUND_Y = CANVAS_HEIGHT - 40;
 
-// Level scroll
+// Level
 export const SCROLL_THRESHOLD = 350;
-export const LEVEL_WIDTH = 6000;
+export const LEVEL_WIDTH = 8000;
+
+// Boss arena
+export const BOSS_ARENA_LEFT = 7000;
+export const BOSS_ARENA_RIGHT = 7950;
+export const BOSS_WIDTH = 100;
+export const BOSS_HEIGHT = 120;
+export const BOSS_MAX_HP = 3;
 
 // Colors
 export const SKY_COLOR = '#87CEEB';
