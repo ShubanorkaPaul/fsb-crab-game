@@ -44,16 +44,13 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState) {
     const imgRatio = bgImage.naturalWidth / bgImage.naturalHeight;
     const canvasRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
 
-    // Cover the whole canvas keeping proportions (like CSS background-size: cover)
     let drawW = CANVAS_WIDTH;
     let drawH = CANVAS_HEIGHT;
 
     if (imgRatio > canvasRatio) {
-      // image is wider — fit by height, crop sides
       drawH = CANVAS_HEIGHT;
       drawW = CANVAS_HEIGHT * imgRatio;
     } else {
-      // image is taller — fit by width, crop top/bottom
       drawW = CANVAS_WIDTH;
       drawH = CANVAS_WIDTH / imgRatio;
     }
@@ -196,7 +193,6 @@ function drawBeer(ctx: CanvasRenderingContext2D, beer: BeerCan, time: number) {
   if (beerImage && beerImage.complete && beerImage.naturalWidth > 0) {
     ctx.drawImage(beerImage, beer.x, drawY, beer.width, beer.height);
   } else {
-    // Fallback
     const canGrad = ctx.createLinearGradient(beer.x, drawY, beer.x + beer.width, drawY);
     canGrad.addColorStop(0, '#DAA520');
     canGrad.addColorStop(0.5, '#FFD700');
@@ -435,11 +431,11 @@ function drawUI(ctx: CanvasRenderingContext2D, state: GameState) {
   ctx.textAlign = 'left';
 
   if (state.gameOver) {
-    drawOverlay(ctx, '💀 GAME OVER 💀', '#FF1744', 'Press SPACE to restart');
+    drawOverlay(ctx, '💀 GAME OVER 💀', '#FF1744', 'Press SPACE / Tap to restart');
   }
 
   if (state.gameWon) {
-    drawOverlay(ctx, '🎉 YOU WIN! 🎉', '#FFD700', `Score: ${state.score} | Press SPACE to restart`);
+    drawOverlay(ctx, '🎉 YOU WIN! 🎉', '#FFD700', `Score: ${state.score} | Tap to restart`);
   }
 
   if (!state.gameStarted) {
@@ -469,31 +465,32 @@ function drawStartScreen(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = '#FF5252';
   ctx.font = 'bold 32px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('🦀 FSB CRAB 🦀', CANVAS_WIDTH / 2, 120);
+  ctx.fillText('🦀 FSB CRAB 🦀', CANVAS_WIDTH / 2, 100);
 
   ctx.fillStyle = '#FFD700';
   ctx.font = 'bold 20px "Press Start 2P", monospace';
-  ctx.fillText('AMBERLAND HUNTER', CANVAS_WIDTH / 2, 160);
+  ctx.fillText('AMBERLAND HUNTER', CANVAS_WIDTH / 2, 140);
 
   ctx.fillStyle = '#fff';
   ctx.font = '14px monospace';
   const instructions = [
-    '← → or A/D - Move',
-    '↑ or W or SPACE - Jump',
+    '← → or A/D — Move',
+    '↑ or W or SPACE — Jump',
     'Press JUMP twice for DOUBLE JUMP!',
+    'On phone: use on-screen buttons',
     'Collect all 🍺 beer cans!',
     'Jump on enemies to defeat them!',
   ];
 
   instructions.forEach((text, i) => {
-    ctx.fillText(text, CANVAS_WIDTH / 2, 220 + i * 28);
+    ctx.fillText(text, CANVAS_WIDTH / 2, 200 + i * 26);
   });
 
   const blink = Math.sin(Date.now() * 0.005) > 0;
   if (blink) {
     ctx.fillStyle = '#4CAF50';
     ctx.font = 'bold 18px "Press Start 2P", monospace';
-    ctx.fillText('Press SPACE to start!', CANVAS_WIDTH / 2, 420);
+    ctx.fillText('Press SPACE / Tap to start!', CANVAS_WIDTH / 2, 430);
   }
 
   ctx.textAlign = 'left';
@@ -501,32 +498,73 @@ function drawStartScreen(ctx: CanvasRenderingContext2D) {
 
 export function renderMobileControls(ctx: CanvasRenderingContext2D) {
   ctx.save();
-  ctx.globalAlpha = 0.4;
 
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(70, CANVAS_HEIGHT - 60, 30, 0, Math.PI * 2);
-  ctx.fill();
+  const btnY = CANVAS_HEIGHT - 65;
+  const btnR = 45;
+
+  // ==== LEFT BUTTON ====
+  ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#000';
-  ctx.font = 'bold 24px Arial';
+  ctx.beginPath();
+  ctx.arc(85, btnY, btnR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(85, btnY, btnR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 36px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('◀', 70, CANVAS_HEIGHT - 52);
+  ctx.textBaseline = 'middle';
+  ctx.fillText('◀', 85, btnY);
 
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(150, CANVAS_HEIGHT - 60, 30, 0, Math.PI * 2);
-  ctx.fill();
+  // ==== RIGHT BUTTON ====
+  ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#000';
-  ctx.fillText('▶', 150, CANVAS_HEIGHT - 52);
+  ctx.beginPath();
+  ctx.arc(225, btnY, btnR, 0, Math.PI * 2);
+  ctx.fill();
 
-  ctx.fillStyle = '#fff';
+  ctx.globalAlpha = 0.85;
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(CANVAS_WIDTH - 80, CANVAS_HEIGHT - 60, 35, 0, Math.PI * 2);
+  ctx.arc(225, btnY, btnR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 36px Arial';
+  ctx.fillText('▶', 225, btnY);
+
+  // ==== JUMP BUTTON (right side, bigger) ====
+  const jumpX = CANVAS_WIDTH - 90;
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = '#4CAF50';
+  ctx.beginPath();
+  ctx.arc(jumpX, btnY, 55, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#000';
-  ctx.font = 'bold 20px Arial';
-  ctx.fillText('JUMP', CANVAS_WIDTH - 80, CANVAS_HEIGHT - 55);
+
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = '#FFF';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(jumpX, btnY, 55, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#FFF';
+  ctx.font = 'bold 16px "Press Start 2P", monospace';
+  ctx.fillText('JUMP', jumpX, btnY - 4);
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('x2 = ↑↑', jumpX, btnY + 16);
 
   ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
   ctx.restore();
 }
