@@ -11,8 +11,12 @@
   box-sizing: border-box;
 }
 
-body {
+html, body, #root {
+  height: 100%;
   overflow: hidden;
+}
+
+body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -22,19 +26,15 @@ canvas {
   outline: none;
   touch-action: none;
   display: block;
-  max-width: 100vw;
-  max-height: 100vh;
 }
 
 canvas:focus {
   outline: none;
 }
 
-/* === Compact layout on mobile landscape === */
+/* === On mobile landscape: hide title/controls, canvas fills screen === */
 @media only screen and (max-height: 600px) and (orientation: landscape) {
-  .app-title {
-    display: none !important;
-  }
+  .app-title,
   .app-footer,
   .app-controls {
     display: none !important;
@@ -42,13 +42,9 @@ canvas:focus {
   .app-container {
     padding: 0 !important;
     min-height: 100vh !important;
-    justify-content: center !important;
-  }
-  canvas {
-    max-height: 100vh !important;
-    width: auto !important;
     height: 100vh !important;
-    max-width: 100vw !important;
+    justify-content: center !important;
+    align-items: center !important;
   }
 }
 
