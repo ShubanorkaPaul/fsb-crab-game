@@ -1,5 +1,5 @@
-import { GameState, Keys, Rect } from './types';
-import { createPlatforms, createBeers, createEnemies, createClouds } from './level';
+import { GameState, Keys, Rect, Enemy, Projectile } from './types';
+import { createPlatforms, createBeers, createEnemies, createClouds, createBoss } from './level';
 import {
   GRAVITY,
   JUMP_FORCE,
@@ -12,6 +12,7 @@ import {
   CANVAS_HEIGHT,
   SCROLL_THRESHOLD,
   GROUND_Y,
+  BOSS_ARENA_LEFT,
 } from './constants';
 
 export function createInitialState(): GameState {
@@ -30,10 +31,13 @@ export function createInitialState(): GameState {
       isJumping: false,
       jumpsUsed: 0,
       jumpKeyHeld: false,
+      invulnTimer: 0,
     },
     beers: createBeers(),
     platforms: createPlatforms(),
     enemies: createEnemies(),
+    boss: createBoss(),
+    projectiles: [],
     particles: [],
     cameraX: 0,
     score: 0,
@@ -63,13 +67,24 @@ export function update(state: GameState, keys: Keys): GameState {
 
   updatePlayer(newState, keys);
   updateEnemies(newState);
+  updateBoss(newState);
+  updateProjectiles(newState);
   checkBeerCollisions(newState);
   checkEnemyCollisions(newState);
+  checkBossCollision(newState);
+  checkProjectileCollisions(newState);
   updateParticles(newState);
   updateCamera(newState);
 
-  const allCollected = newState.beers.every(b => b.collected);
-  if (allCollected) {
+  if (newState.player.invulnTimer > 0) {
+    newState.player.invulnTimer -= 1;
+  }
+  if (newState.boss.invulnTimer > 0) {
+    newState.boss.invulnTimer -= 1;
+  }
+
+  // Win only when boss defeated (banks are bonus)
+  if (!newState.boss.alive) {
     newState.gameWon = true;
   }
 
@@ -84,6 +99,7 @@ export function update(state: GameState, keys: Keys): GameState {
       newState.player.vy = 0;
       newState.player.jumpsUsed = 0;
       newState.player.jumpKeyHeld = false;
+      newState.player.invulnTimer = 60;
     }
   }
 
@@ -93,7 +109,6 @@ export function update(state: GameState, keys: Keys): GameState {
 function updatePlayer(state: GameState, keys: Keys) {
   const player = state.player;
 
-  // Horizontal movement
   if (keys.left) {
     player.vx = -MOVE_SPEED;
     player.facingRight = false;
@@ -105,22 +120,17 @@ function updatePlayer(state: GameState, keys: Keys) {
     if (Math.abs(player.vx) < 0.2) player.vx = 0;
   }
 
-  // === JUMP LOGIC (edge-triggered for reliable double jump) ===
   const jumpKeyDown = keys.up || keys.space;
 
   if (jumpKeyDown && !player.jumpKeyHeld) {
     if (player.onGround) {
-      // First jump
       player.vy = JUMP_FORCE;
       player.onGround = false;
       player.isJumping = true;
       player.jumpsUsed = 1;
     } else if (player.jumpsUsed < MAX_JUMPS) {
-      // Double jump
       player.vy = DOUBLE_JUMP_FORCE;
       player.jumpsUsed += 1;
-
-      // Sparkle particles for double jump
       for (let i = 0; i < 10; i++) {
         state.particles.push({
           x: player.x + player.width / 2,
@@ -138,18 +148,15 @@ function updatePlayer(state: GameState, keys: Keys) {
 
   player.jumpKeyHeld = jumpKeyDown;
 
-  // Gravity
   player.vy += GRAVITY;
   if (player.vy > MAX_FALL_SPEED) player.vy = MAX_FALL_SPEED;
 
-  // Move X
   player.x += player.vx;
 
   if (player.x < state.cameraX) {
     player.x = state.cameraX;
   }
 
-  // Platform collision X
   for (const platform of state.platforms) {
     if (rectsOverlap(player, platform)) {
       if (player.vx > 0) {
@@ -161,10 +168,8 @@ function updatePlayer(state: GameState, keys: Keys) {
     }
   }
 
-  // Move Y
   player.y += player.vy;
 
-  // Platform collision Y
   player.onGround = false;
   for (const platform of state.platforms) {
     if (rectsOverlap(player, platform)) {
@@ -173,7 +178,7 @@ function updatePlayer(state: GameState, keys: Keys) {
         player.vy = 0;
         player.onGround = true;
         player.isJumping = false;
-        player.jumpsUsed = 0; // reset on landing
+        player.jumpsUsed = 0;
       } else if (player.vy < 0) {
         player.y = platform.y + platform.height;
         player.vy = 0;
@@ -181,7 +186,6 @@ function updatePlayer(state: GameState, keys: Keys) {
     }
   }
 
-  // Animation
   if (Math.abs(player.vx) > 0.5) {
     player.animTimer++;
     if (player.animTimer % 8 === 0) {
@@ -195,9 +199,99 @@ function updatePlayer(state: GameState, keys: Keys) {
 function updateEnemies(state: GameState) {
   for (const enemy of state.enemies) {
     if (!enemy.alive) continue;
-
-    enemy.x += enemy.vx;
     enemy.animTimer++;
+
+    if (enemy.type === 'crow') {
+      // Flying pattern — sine wave
+      enemy.x += enemy.vx;
+      enemy.y = enemy.baseY + Math.sin(enemy.animTimer * 0.05) * 30;
+      // Occasionally drop projectile
+      if (enemy.animTimer % 180 === 0 &&
+          Math.abs(enemy.x - state.player.x) < 300) {
+        state.projectiles.push({
+          x: enemy.x + enemy.width / 2 - 8,
+          y: enemy.y + enemy.height,
+          width: 16,
+          height: 16,
+          vx: 0,
+          vy: 3,
+          type: 'poop',
+          rotation: 0,
+          alive: true,
+        });
+      }
+      // Wrap-around when off screen
+      if (enemy.x < state.cameraX - 200) {
+        enemy.x = state.cameraX + 900;
+      }
+      continue;
+    }
+
+    if (enemy.type === 'mine') {
+      // Stationary. Bob slightly.
+      enemy.y = enemy.baseY + Math.sin(enemy.animTimer * 0.1) * 3;
+      // Explode when player is very close
+      const dx = (state.player.x + state.player.width / 2) - (enemy.x + enemy.width / 2);
+      const dy = (state.player.y + state.player.height / 2) - (enemy.y + enemy.height / 2);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 45 && !enemy.exploded) {
+        enemy.exploded = true;
+        enemy.alive = false;
+        // Damage player if very close
+        if (dist < 40 && state.player.invulnTimer <= 0) {
+          hurtPlayer(state);
+        }
+        // Explosion particles
+        for (let i = 0; i < 25; i++) {
+          state.particles.push({
+            x: enemy.x + enemy.width / 2,
+            y: enemy.y + enemy.height / 2,
+            vx: (Math.random() - 0.5) * 12,
+            vy: (Math.random() - 0.5) * 12,
+            life: 40,
+            maxLife: 40,
+            color: ['#FF5722', '#FFC107', '#F44336', '#FFEB3B'][Math.floor(Math.random() * 4)],
+            size: 5 + Math.random() * 4,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (enemy.type === 'ninja') {
+      // Ground walk + occasional jump
+      enemy.jumpTimer -= 1;
+      enemy.vy += GRAVITY;
+      if (enemy.vy > MAX_FALL_SPEED) enemy.vy = MAX_FALL_SPEED;
+
+      enemy.x += enemy.vx;
+      enemy.y += enemy.vy;
+
+      // Ground collision
+      let onGround = false;
+      for (const platform of state.platforms) {
+        if (rectsOverlap(enemy, platform) && enemy.vy > 0) {
+          enemy.y = platform.y - enemy.height;
+          enemy.vy = 0;
+          onGround = true;
+        }
+      }
+
+      if (onGround && enemy.jumpTimer <= 0) {
+        enemy.vy = -10;
+        enemy.jumpTimer = 60 + Math.random() * 60;
+      }
+
+      // Chase player if close
+      const dx = state.player.x - enemy.x;
+      if (Math.abs(dx) < 400) {
+        enemy.vx = dx > 0 ? 2 : -2;
+      }
+      continue;
+    }
+
+    // Bottle & Rat — ground walkers
+    enemy.x += enemy.vx;
 
     let onPlatform = false;
     for (const platform of state.platforms) {
@@ -213,12 +307,10 @@ function updateEnemies(state: GameState) {
           enemy.vx = -Math.abs(enemy.vx);
         }
       }
-
       if (rectsOverlap(enemy, platform) && platform.type === 'pipe') {
         enemy.vx = -enemy.vx;
       }
     }
-
     if (!onPlatform) {
       enemy.vx = -enemy.vx;
       enemy.x += enemy.vx * 5;
@@ -226,17 +318,107 @@ function updateEnemies(state: GameState) {
   }
 }
 
+function updateBoss(state: GameState) {
+  const boss = state.boss;
+  if (!boss.alive) return;
+
+  // Activate when player enters arena
+  if (!boss.active && state.player.x > BOSS_ARENA_LEFT - 100) {
+    boss.active = true;
+  }
+  if (!boss.active) return;
+
+  boss.animTimer++;
+
+  // Movement — patrol between arena bounds
+  boss.x += boss.vx;
+  if (boss.x < boss.arenaLeft) {
+    boss.x = boss.arenaLeft;
+    boss.vx = Math.abs(boss.vx);
+    boss.facingRight = true;
+  } else if (boss.x + boss.width > boss.arenaRight) {
+    boss.x = boss.arenaRight - boss.width;
+    boss.vx = -Math.abs(boss.vx);
+    boss.facingRight = false;
+  }
+
+  // Gravity for boss
+  boss.vy += GRAVITY;
+  boss.y += boss.vy;
+  for (const platform of state.platforms) {
+    if (rectsOverlap(boss, platform) && boss.vy > 0) {
+      boss.y = platform.y - boss.height;
+      boss.vy = 0;
+    }
+  }
+
+  // Throw documents
+  boss.throwTimer -= 1;
+  if (boss.throwTimer <= 0) {
+    const throwInterval = boss.phase === 1 ? 110 : boss.phase === 2 ? 75 : 45;
+    boss.throwTimer = throwInterval;
+
+    const dirX = state.player.x - boss.x;
+    const dir = dirX > 0 ? 1 : -1;
+
+    // Number of documents grows with phase
+    const count = boss.phase;
+    for (let i = 0; i < count; i++) {
+      state.projectiles.push({
+        x: boss.x + boss.width / 2 - 12,
+        y: boss.y + 30,
+        width: 24,
+        height: 18,
+        vx: dir * (3 + i * 0.5 + Math.random()),
+        vy: -6 - Math.random() * 2,
+        type: 'document',
+        rotation: 0,
+        alive: true,
+      });
+    }
+  }
+}
+
+function updateProjectiles(state: GameState) {
+  for (const p of state.projectiles) {
+    if (!p.alive) continue;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.3; // gravity
+    p.rotation += 0.2;
+
+    // Off-screen or hit ground
+    if (p.y > GROUND_Y - p.height + 5) {
+      p.alive = false;
+      // Puff
+      for (let i = 0; i < 6; i++) {
+        state.particles.push({
+          x: p.x,
+          y: p.y,
+          vx: (Math.random() - 0.5) * 3,
+          vy: -Math.random() * 2,
+          life: 20,
+          maxLife: 20,
+          color: p.type === 'document' ? '#F5DEB3' : '#8B4513',
+          size: 3,
+        });
+      }
+    }
+    if (p.x < state.cameraX - 100 || p.x > state.cameraX + 1000) {
+      p.alive = false;
+    }
+  }
+  state.projectiles = state.projectiles.filter(p => p.alive);
+}
+
 function checkBeerCollisions(state: GameState) {
   for (const beer of state.beers) {
     if (beer.collected) continue;
-
     const bobY = Math.sin(state.time * 0.05 + beer.bobOffset) * 5;
     const beerRect = { ...beer, y: beer.y + bobY };
-
     if (rectsOverlap(state.player, beerRect)) {
       beer.collected = true;
       state.score += 100;
-
       for (let i = 0; i < 12; i++) {
         state.particles.push({
           x: beer.x + beer.width / 2,
@@ -256,38 +438,123 @@ function checkBeerCollisions(state: GameState) {
 function checkEnemyCollisions(state: GameState) {
   for (const enemy of state.enemies) {
     if (!enemy.alive) continue;
-
     if (rectsOverlap(state.player, enemy)) {
-      if (state.player.vy > 0 && state.player.y + state.player.height - 10 < enemy.y + enemy.height / 2) {
+      // Mines and crows can't be stomped (crow too high normally, mine explodes anyway)
+      const canStomp = enemy.type !== 'mine';
+      const isStomping = state.player.vy > 0 &&
+        state.player.y + state.player.height - 10 < enemy.y + enemy.height / 2;
+
+      if (canStomp && isStomping) {
         enemy.alive = false;
         state.player.vy = JUMP_FORCE * 0.6;
         state.player.jumpsUsed = 1;
-        state.score += 200;
-
-        for (let i = 0; i < 10; i++) {
-          state.particles.push({
-            x: enemy.x + enemy.width / 2,
-            y: enemy.y + enemy.height / 2,
-            vx: (Math.random() - 0.5) * 8,
-            vy: -Math.random() * 6 - 1,
-            life: 30 + Math.random() * 20,
-            maxLife: 50,
-            color: enemy.type === 'bottle' ? '#2196F3' : '#666',
-            size: 4 + Math.random() * 3,
-          });
-        }
-      } else {
-        state.lives -= 1;
-        if (state.lives <= 0) {
-          state.gameOver = true;
-        } else {
-          state.player.vy = -8;
-          state.player.vx = state.player.x < enemy.x ? -5 : 5;
-          state.player.y -= 20;
-          state.player.jumpsUsed = 1;
-        }
+        state.score += enemy.type === 'crow' ? 300 : enemy.type === 'ninja' ? 250 : 200;
+        spawnStompParticles(state, enemy);
+      } else if (state.player.invulnTimer <= 0) {
+        hurtPlayer(state);
+        // Knockback
+        state.player.vy = -8;
+        state.player.vx = state.player.x < enemy.x ? -5 : 5;
+        state.player.y -= 20;
+        state.player.jumpsUsed = 1;
       }
     }
+  }
+}
+
+function checkBossCollision(state: GameState) {
+  const boss = state.boss;
+  if (!boss.alive || !boss.active) return;
+
+  if (rectsOverlap(state.player, boss)) {
+    const isStomping = state.player.vy > 0 &&
+      state.player.y + state.player.height - 15 < boss.y + boss.height / 2;
+
+    if (isStomping && boss.invulnTimer <= 0) {
+      boss.hp -= 1;
+      boss.invulnTimer = 60;
+      state.player.vy = JUMP_FORCE * 0.9;
+      state.player.jumpsUsed = 1;
+      state.score += 500;
+
+      // Speed up boss on damage
+      boss.phase = Math.min(3, boss.maxHp - boss.hp + 1);
+      boss.vx = boss.vx > 0 ? 2 + boss.phase : -(2 + boss.phase);
+
+      // Explosion
+      for (let i = 0; i < 30; i++) {
+        state.particles.push({
+          x: boss.x + boss.width / 2,
+          y: boss.y + 20,
+          vx: (Math.random() - 0.5) * 10,
+          vy: -Math.random() * 8 - 2,
+          life: 40,
+          maxLife: 40,
+          color: ['#FFD700', '#FF5722', '#F44336'][Math.floor(Math.random() * 3)],
+          size: 4 + Math.random() * 4,
+        });
+      }
+
+      if (boss.hp <= 0) {
+        boss.alive = false;
+        state.score += 2000;
+        // Big explosion
+        for (let i = 0; i < 60; i++) {
+          state.particles.push({
+            x: boss.x + boss.width / 2,
+            y: boss.y + boss.height / 2,
+            vx: (Math.random() - 0.5) * 15,
+            vy: (Math.random() - 0.5) * 15,
+            life: 60,
+            maxLife: 60,
+            color: ['#FFD700', '#FF5722', '#F44336', '#4CAF50'][Math.floor(Math.random() * 4)],
+            size: 6 + Math.random() * 5,
+          });
+        }
+      }
+    } else if (state.player.invulnTimer <= 0 && boss.invulnTimer <= 0) {
+      hurtPlayer(state);
+      state.player.vy = -10;
+      state.player.vx = state.player.x < boss.x ? -7 : 7;
+      state.player.jumpsUsed = 1;
+    }
+  }
+}
+
+function checkProjectileCollisions(state: GameState) {
+  for (const p of state.projectiles) {
+    if (!p.alive) continue;
+    if (rectsOverlap(state.player, p) && state.player.invulnTimer <= 0) {
+      p.alive = false;
+      hurtPlayer(state);
+      state.player.vy = -6;
+    }
+  }
+}
+
+function spawnStompParticles(state: GameState, enemy: Enemy) {
+  for (let i = 0; i < 10; i++) {
+    state.particles.push({
+      x: enemy.x + enemy.width / 2,
+      y: enemy.y + enemy.height / 2,
+      vx: (Math.random() - 0.5) * 8,
+      vy: -Math.random() * 6 - 1,
+      life: 30 + Math.random() * 20,
+      maxLife: 50,
+      color: enemy.type === 'bottle' ? '#2196F3' :
+             enemy.type === 'crow'   ? '#333' :
+             enemy.type === 'ninja'  ? '#111' :
+             '#666',
+      size: 4 + Math.random() * 3,
+    });
+  }
+}
+
+function hurtPlayer(state: GameState) {
+  state.lives -= 1;
+  state.player.invulnTimer = 90;
+  if (state.lives <= 0) {
+    state.gameOver = true;
   }
 }
 
