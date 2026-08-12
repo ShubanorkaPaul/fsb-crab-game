@@ -13,7 +13,10 @@
 
 html, body, #root {
   height: 100%;
+  width: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
+  position: fixed;
 }
 
 body {
@@ -32,7 +35,7 @@ canvas:focus {
   outline: none;
 }
 
-/* === On mobile landscape: hide title/controls, canvas fills screen === */
+/* === Mobile landscape: hide title/controls, canvas fills screen === */
 @media only screen and (max-height: 600px) and (orientation: landscape) {
   .app-title,
   .app-footer,
