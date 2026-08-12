@@ -9,11 +9,11 @@ export const MAX_JUMPS = 2;
 export const MOVE_SPEED = 5;
 export const MAX_FALL_SPEED = 12;
 
-export const PLAYER_WIDTH = 60;
-export const PLAYER_HEIGHT = 60;
+export const PLAYER_WIDTH = 80;
+export const PLAYER_HEIGHT = 80;
 
-export const BEER_WIDTH = 40;
-export const BEER_HEIGHT = 50;
+export const BEER_WIDTH = 50;
+export const BEER_HEIGHT = 65;
 
 export const PLATFORM_HEIGHT = 20;
 
