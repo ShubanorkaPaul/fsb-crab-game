@@ -20,6 +20,7 @@ export interface Player extends Rect {
   isJumping: boolean;
   jumpsUsed: number;
   jumpKeyHeld: boolean;
+  invulnTimer: number;
 }
 
 export interface BeerCan extends Rect {
@@ -32,12 +33,42 @@ export interface Platform extends Rect {
   type: 'ground' | 'brick' | 'pipe';
 }
 
+export type EnemyType = 'bottle' | 'rat' | 'crow' | 'mine' | 'ninja';
+
 export interface Enemy extends Rect {
   vx: number;
+  vy: number;
   alive: boolean;
-  type: 'bottle' | 'rat';
+  type: EnemyType;
   animFrame: number;
   animTimer: number;
+  baseY: number;      // for flying pattern
+  jumpTimer: number;  // for ninja
+  exploded: boolean;  // for mine
+}
+
+export interface Boss extends Rect {
+  vx: number;
+  vy: number;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  facingRight: boolean;
+  animTimer: number;
+  throwTimer: number;
+  invulnTimer: number;
+  arenaLeft: number;
+  arenaRight: number;
+  phase: number;     // 1, 2, 3 — gets angrier
+  active: boolean;   // becomes true when player reaches arena
+}
+
+export interface Projectile extends Rect {
+  vx: number;
+  vy: number;
+  type: 'document' | 'poop';
+  rotation: number;
+  alive: boolean;
 }
 
 export interface Particle {
@@ -56,6 +87,8 @@ export interface GameState {
   beers: BeerCan[];
   platforms: Platform[];
   enemies: Enemy[];
+  boss: Boss;
+  projectiles: Projectile[];
   particles: Particle[];
   cameraX: number;
   score: number;
