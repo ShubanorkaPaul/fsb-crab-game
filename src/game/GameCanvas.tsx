@@ -1,9 +1,18 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { Keys } from './types';
 import { createInitialState, update } from './engine';
 import { render, renderMobileControls, loadImages } from './renderer';
 import { playJump, playCollect, playStomp, playHurt, playWin, playGameOver } from './audio';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
+
+// Detect touch device
+function isTouchDevice(): boolean {
+  return (
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0 ||
+    window.matchMedia('(pointer: coarse)').matches
+  );
+}
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -13,7 +22,13 @@ export default function GameCanvas() {
   const prevLivesRef = useRef(3);
   const prevGameOverRef = useRef(false);
   const prevGameWonRef = useRef(false);
+  const [isMobile, setIsMobile] = useState(false);
   const isMobileRef = useRef(false);
+
+  // Track which touch is pressing which button (multi-touch)
+  const activeTouchesRef = useRef<Map<number, 'left' | 'right' | 'jump'>>(new Map());
+  // For "re-tap" double jump: pulse jump key
+  const jumpPulseRef = useRef(false);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const keys = keysRef.current;
@@ -61,63 +76,140 @@ export default function GameCanvas() {
     }
   }, []);
 
-  const handleTouch = useCallback((e: TouchEvent) => {
-    e.preventDefault();
-    isMobileRef.current = true;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = CANVAS_WIDTH / rect.width;
-    const scaleY = CANVAS_HEIGHT / rect.height;
-
-    const keys = keysRef.current;
-    keys.left = false;
-    keys.right = false;
-    keys.up = false;
-    keys.space = false;
-
-    for (let i = 0; i < e.touches.length; i++) {
-      const touch = e.touches[i];
+  // Convert touch position to canvas coords and detect button
+  const getButtonFromTouch = useCallback(
+    (touch: Touch, rect: DOMRect): 'left' | 'right' | 'jump' | null => {
+      const scaleX = CANVAS_WIDTH / rect.width;
+      const scaleY = CANVAS_HEIGHT / rect.height;
       const x = (touch.clientX - rect.left) * scaleX;
       const y = (touch.clientY - rect.top) * scaleY;
 
-      // Left button area
-      if (x < 110 && y > CANVAS_HEIGHT - 100) {
-        keys.left = true;
+      // Left button: x 20-140, bottom
+      if (x >= 20 && x <= 150 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
+        return 'left';
       }
-      // Right button area
-      if (x >= 110 && x < 200 && y > CANVAS_HEIGHT - 100) {
-        keys.right = true;
+      // Right button: x 160-280, bottom
+      if (x >= 160 && x <= 290 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
+        return 'right';
       }
-      // Jump button area
-      if (x > CANVAS_WIDTH - 130 && y > CANVAS_HEIGHT - 100) {
-        keys.up = true;
-        keys.space = true;
+      // Jump button: right side
+      if (x >= CANVAS_WIDTH - 160 && x <= CANVAS_WIDTH - 20 && y >= CANVAS_HEIGHT - 130 && y <= CANVAS_HEIGHT) {
+        return 'jump';
       }
-      // Tap anywhere to start/restart
-      if (!stateRef.current.gameStarted || stateRef.current.gameOver || stateRef.current.gameWon) {
-        keys.space = true;
-      }
+      return null;
+    },
+    []
+  );
+
+  const updateKeysFromTouches = useCallback(() => {
+    const keys = keysRef.current;
+    const active = activeTouchesRef.current;
+
+    keys.left = false;
+    keys.right = false;
+    // NOTE: don't reset jump/space here — they are pulsed separately
+
+    let jumpHeld = false;
+    active.forEach((btn) => {
+      if (btn === 'left') keys.left = true;
+      if (btn === 'right') keys.right = true;
+      if (btn === 'jump') jumpHeld = true;
+    });
+
+    // Keep jump held while finger is on jump button
+    if (jumpHeld) {
+      keys.up = true;
+      keys.space = true;
+    } else {
+      keys.up = false;
+      keys.space = false;
     }
   }, []);
 
-  const handleTouchEnd = useCallback((e: TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 0) {
-      const keys = keysRef.current;
-      keys.left = false;
-      keys.right = false;
-      keys.up = false;
-      keys.space = false;
-    } else {
-      // Re-evaluate remaining touches
-      handleTouch(e as unknown as TouchEvent);
-    }
-  }, [handleTouch]);
+  const handleTouchStart = useCallback(
+    (e: TouchEvent) => {
+      e.preventDefault();
+      isMobileRef.current = true;
+      setIsMobile(true);
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+
+      // Tap-to-start / tap-to-restart when on menu screens
+      const state = stateRef.current;
+      const onMenu = !state.gameStarted || state.gameOver || state.gameWon;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const btn = getButtonFromTouch(touch, rect);
+
+        if (btn) {
+          activeTouchesRef.current.set(touch.identifier, btn);
+
+          // For jump button: on menu → start game; in game → pulse jump for reliable double-jump
+          if (btn === 'jump') {
+            if (onMenu) {
+              keysRef.current.space = true;
+              setTimeout(() => {
+                keysRef.current.space = false;
+              }, 100);
+            } else {
+              // Pulse: release space for 1 frame so engine detects new press
+              jumpPulseRef.current = true;
+            }
+          }
+        } else if (onMenu) {
+          // Any tap outside buttons starts/restarts game
+          keysRef.current.space = true;
+          setTimeout(() => {
+            keysRef.current.space = false;
+          }, 100);
+        }
+      }
+
+      updateKeysFromTouches();
+    },
+    [getButtonFromTouch, updateKeysFromTouches]
+  );
+
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      e.preventDefault();
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+
+      // Update which button each finger is on
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        const btn = getButtonFromTouch(touch, rect);
+        if (btn) {
+          activeTouchesRef.current.set(touch.identifier, btn);
+        } else {
+          activeTouchesRef.current.delete(touch.identifier);
+        }
+      }
+      updateKeysFromTouches();
+    },
+    [getButtonFromTouch, updateKeysFromTouches]
+  );
+
+  const handleTouchEnd = useCallback(
+    (e: TouchEvent) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        activeTouchesRef.current.delete(e.changedTouches[i].identifier);
+      }
+      updateKeysFromTouches();
+    },
+    [updateKeysFromTouches]
+  );
 
   useEffect(() => {
     loadImages();
+    setIsMobile(isTouchDevice());
+    isMobileRef.current = isTouchDevice();
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -127,14 +219,21 @@ export default function GameCanvas() {
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    canvas.addEventListener('touchstart', handleTouch, { passive: false });
-    canvas.addEventListener('touchmove', handleTouch, { passive: false });
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
     let animId: number;
 
     function gameLoop() {
       const state = stateRef.current;
+
+      // Handle jump pulse: release space for 1 frame, then re-press
+      // This makes double-jump work with a held finger (tap → tap)
+      // Handled via touchstart: we don't need extra logic here since
+      // touchstart re-fires each tap separately, giving natural edge-trigger.
+
       const newState = update(state, keysRef.current);
 
       // Sound effects
@@ -174,13 +273,6 @@ export default function GameCanvas() {
 
       stateRef.current = newState;
 
-      // Reset space key after processing to prevent re-triggering
-      if (keysRef.current.space && (!newState.gameStarted || newState.gameOver || newState.gameWon)) {
-        setTimeout(() => {
-          keysRef.current.space = false;
-        }, 100);
-      }
-
       render(ctx!, newState);
 
       if (isMobileRef.current) {
@@ -196,11 +288,12 @@ export default function GameCanvas() {
       cancelAnimationFrame(animId);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      canvas.removeEventListener('touchstart', handleTouch);
-      canvas.removeEventListener('touchmove', handleTouch);
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
       canvas.removeEventListener('touchend', handleTouchEnd);
+      canvas.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [handleKeyDown, handleKeyUp, handleTouch, handleTouchEnd]);
+  }, [handleKeyDown, handleKeyUp, handleTouchStart, handleTouchMove, handleTouchEnd]);
 
   return (
     <canvas
@@ -211,6 +304,7 @@ export default function GameCanvas() {
       style={{
         imageRendering: 'pixelated',
         aspectRatio: `${CANVAS_WIDTH}/${CANVAS_HEIGHT}`,
+        touchAction: 'none', // prevent browser scrolling/zooming on canvas
       }}
       tabIndex={0}
     />
