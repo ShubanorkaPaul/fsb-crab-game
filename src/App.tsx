@@ -12,9 +12,9 @@ export default function App() {
       </div>
 
       {/* Main game screen */}
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col items-center justify-center p-4">
+      <div className="app-container min-h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 flex flex-col items-center justify-center p-4">
         {/* Title */}
-        <div className="text-center mb-4">
+        <div className="app-title text-center mb-4">
           <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-amber-400 to-red-500 mb-1 tracking-wider">
             🦀 FSB CRAB 🦀
           </h1>
@@ -27,7 +27,7 @@ export default function App() {
         <GameCanvas />
 
         {/* Controls info */}
-        <div className="mt-4 text-gray-400 text-sm text-center font-mono space-y-1">
+        <div className="app-controls mt-4 text-gray-400 text-sm text-center font-mono space-y-1">
           <p>
             <span className="text-amber-400">←→</span> or{' '}
             <span className="text-amber-400">A/D</span> — Move |{' '}
@@ -39,7 +39,7 @@ export default function App() {
         </div>
 
         {/* Footer */}
-        <div className="mt-6 text-gray-600 text-xs font-mono">
+        <div className="app-footer mt-6 text-gray-600 text-xs font-mono">
           <p>Made with 🦀 and ❤️ | A totally serious game</p>
         </div>
       </div>
