@@ -9,7 +9,7 @@ export default function App() {
           🦀 FSB CRAB 🦀
         </h1>
         <p className="text-amber-400 text-lg md:text-xl font-mono tracking-widest">
-          AMBERLAND HUNTER
+          AMBIRLAND HUNTER
         </p>
       </div>
 
@@ -24,7 +24,7 @@ export default function App() {
           <span className="text-amber-400">↑/W/Space</span> — Jump
         </p>
         <p className="text-gray-500">
-          Collect all 🍺 Amberland beer cans! Jump on enemies to defeat them!
+          Collect all 🍺 Ambirland beer cans! Jump on enemies to defeat them!
         </p>
       </div>
 
