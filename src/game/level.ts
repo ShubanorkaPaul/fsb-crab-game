@@ -4,11 +4,11 @@ import {
   PLATFORM_HEIGHT,
   BEER_WIDTH,
   BEER_HEIGHT,
-  BOSS_ARENA_LEFT,
-  BOSS_ARENA_RIGHT,
+  L1_BOSS_ARENA_LEFT,
+  L1_BOSS_ARENA_RIGHT,
   BOSS_WIDTH,
   BOSS_HEIGHT,
-  BOSS_MAX_HP,
+  L1_BOSS_HP,
 } from './constants';
 
 export function createPlatforms(): Platform[] {
@@ -16,18 +16,15 @@ export function createPlatforms(): Platform[] {
 
   platforms.push({ x: 0, y: GROUND_Y, width: 1200, height: 60, type: 'ground' });
   platforms.push({ x: 1320, y: GROUND_Y, width: 800, height: 60, type: 'ground' });
-
   platforms.push({ x: 2220, y: GROUND_Y, width: 500, height: 60, type: 'ground' });
   platforms.push({ x: 2820, y: GROUND_Y, width: 400, height: 60, type: 'ground' });
   platforms.push({ x: 3320, y: GROUND_Y, width: 600, height: 60, type: 'ground' });
   platforms.push({ x: 4020, y: GROUND_Y, width: 350, height: 60, type: 'ground' });
   platforms.push({ x: 4470, y: GROUND_Y, width: 500, height: 60, type: 'ground' });
   platforms.push({ x: 5070, y: GROUND_Y, width: 400, height: 60, type: 'ground' });
-
   platforms.push({ x: 5570, y: GROUND_Y, width: 700, height: 60, type: 'ground' });
   platforms.push({ x: 6370, y: GROUND_Y, width: 500, height: 60, type: 'ground' });
-
-  platforms.push({ x: BOSS_ARENA_LEFT - 130, y: GROUND_Y, width: 1130, height: 60, type: 'ground' });
+  platforms.push({ x: L1_BOSS_ARENA_LEFT - 130, y: GROUND_Y, width: 1130, height: 60, type: 'ground' });
 
   const floating = [
     { x: 250, y: 340, w: 120 },
@@ -184,38 +181,35 @@ export function createEnemies(): Enemy[] {
     };
   };
 
-  // Zone 1 (0-2000) — placed on ground platforms, away from pipes
   enemies.push(make(300, GROUND_Y, 'bottle', -1.5));
   enemies.push(make(800, GROUND_Y, 'rat', -2));
-  enemies.push(make(1000, GROUND_Y, 'ninja', -1.5));   // cossack #1
+  enemies.push(make(1000, GROUND_Y, 'ninja', -1.5));
   enemies.push(make(1400, GROUND_Y, 'bottle', -1.8));
   enemies.push(make(700, 250, 'crow', -1.5));
 
-  // Zone 2 (2000-5500)
   enemies.push(make(2280, GROUND_Y, 'rat', -2.2));
-  enemies.push(make(2500, GROUND_Y, 'ninja', -2));      // cossack #2
+  enemies.push(make(2500, GROUND_Y, 'ninja', -2));
   enemies.push(make(2650, GROUND_Y, 'mine'));
   enemies.push(make(2900, GROUND_Y, 'bottle', -1.7));
   enemies.push(make(2400, 220, 'crow', -2));
   enemies.push(make(3350, GROUND_Y, 'rat', -2.5));
   enemies.push(make(3600, GROUND_Y, 'mine'));
-  enemies.push(make(3750, GROUND_Y, 'ninja', -2));      // cossack #3
+  enemies.push(make(3750, GROUND_Y, 'ninja', -2));
   enemies.push(make(3900, 200, 'crow', -1.8));
   enemies.push(make(4050, GROUND_Y, 'bottle', -1.8));
   enemies.push(make(4300, GROUND_Y, 'mine'));
-  enemies.push(make(4550, GROUND_Y, 'ninja', -2));      // cossack #4
+  enemies.push(make(4550, GROUND_Y, 'ninja', -2));
   enemies.push(make(4700, 180, 'crow', -2));
   enemies.push(make(4900, GROUND_Y, 'rat', -2.3));
   enemies.push(make(5150, GROUND_Y, 'bottle', -2));
   enemies.push(make(5380, GROUND_Y, 'mine'));
 
-  // Zone 3 (5500-7000)
-  enemies.push(make(5700, GROUND_Y, 'ninja', -2));      // cossack #5
+  enemies.push(make(5700, GROUND_Y, 'ninja', -2));
   enemies.push(make(5950, GROUND_Y, 'rat', -2.5));
   enemies.push(make(5850, 180, 'crow', -2.2));
   enemies.push(make(6150, GROUND_Y, 'mine'));
   enemies.push(make(6400, GROUND_Y, 'bottle', -2));
-  enemies.push(make(6600, GROUND_Y, 'ninja', -2));      // cossack #6
+  enemies.push(make(6600, GROUND_Y, 'ninja', -2));
   enemies.push(make(6500, 160, 'crow', -2.5));
   enemies.push(make(6800, GROUND_Y, 'rat', -2.8));
 
@@ -224,27 +218,27 @@ export function createEnemies(): Enemy[] {
 
 export function createBoss(): Boss {
   return {
-    x: BOSS_ARENA_RIGHT - BOSS_WIDTH - 50,
+    x: L1_BOSS_ARENA_RIGHT - BOSS_WIDTH - 50,
     y: GROUND_Y - BOSS_HEIGHT,
     width: BOSS_WIDTH,
     height: BOSS_HEIGHT,
     vx: -2,
     vy: 0,
-    hp: BOSS_MAX_HP,
-    maxHp: BOSS_MAX_HP,
+    hp: L1_BOSS_HP,
+    maxHp: L1_BOSS_HP,
     alive: true,
     facingRight: false,
     animTimer: 0,
     throwTimer: 60,
     invulnTimer: 0,
-    arenaLeft: BOSS_ARENA_LEFT,
-    arenaRight: BOSS_ARENA_RIGHT,
+    arenaLeft: L1_BOSS_ARENA_LEFT,
+    arenaRight: L1_BOSS_ARENA_RIGHT,
     phase: 1,
     active: false,
+    type: 'general',
   };
 }
 
-// Clouds disabled
 export function createClouds(): Cloud[] {
   return [];
 }
