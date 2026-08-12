@@ -1,4 +1,4 @@
-import { GameState, Keys, Rect, Enemy, Projectile } from './types';
+import { GameState, Keys, Rect, Enemy } from './types';
 import { createPlatforms, createBeers, createEnemies, createClouds, createBoss } from './level';
 import {
   GRAVITY,
@@ -83,7 +83,6 @@ export function update(state: GameState, keys: Keys): GameState {
     newState.boss.invulnTimer -= 1;
   }
 
-  // Win only when boss defeated (banks are bonus)
   if (!newState.boss.alive) {
     newState.gameWon = true;
   }
@@ -202,10 +201,8 @@ function updateEnemies(state: GameState) {
     enemy.animTimer++;
 
     if (enemy.type === 'crow') {
-      // Flying pattern — sine wave
       enemy.x += enemy.vx;
       enemy.y = enemy.baseY + Math.sin(enemy.animTimer * 0.05) * 30;
-      // Occasionally drop projectile
       if (enemy.animTimer % 180 === 0 &&
           Math.abs(enemy.x - state.player.x) < 300) {
         state.projectiles.push({
@@ -220,7 +217,6 @@ function updateEnemies(state: GameState) {
           alive: true,
         });
       }
-      // Wrap-around when off screen
       if (enemy.x < state.cameraX - 200) {
         enemy.x = state.cameraX + 900;
       }
@@ -228,20 +224,16 @@ function updateEnemies(state: GameState) {
     }
 
     if (enemy.type === 'mine') {
-      // Stationary. Bob slightly.
       enemy.y = enemy.baseY + Math.sin(enemy.animTimer * 0.1) * 3;
-      // Explode when player is very close
       const dx = (state.player.x + state.player.width / 2) - (enemy.x + enemy.width / 2);
       const dy = (state.player.y + state.player.height / 2) - (enemy.y + enemy.height / 2);
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 45 && !enemy.exploded) {
+      if (dist < 50 && !enemy.exploded) {
         enemy.exploded = true;
         enemy.alive = false;
-        // Damage player if very close
-        if (dist < 40 && state.player.invulnTimer <= 0) {
+        if (dist < 45 && state.player.invulnTimer <= 0) {
           hurtPlayer(state);
         }
-        // Explosion particles
         for (let i = 0; i < 25; i++) {
           state.particles.push({
             x: enemy.x + enemy.width / 2,
@@ -259,18 +251,37 @@ function updateEnemies(state: GameState) {
     }
 
     if (enemy.type === 'ninja') {
-      // Ground walk + occasional jump
+      // Cossack — walking + occasional jump + horizontal wall bouncing
       enemy.jumpTimer -= 1;
       enemy.vy += GRAVITY;
       if (enemy.vy > MAX_FALL_SPEED) enemy.vy = MAX_FALL_SPEED;
 
+      // Move X
       enemy.x += enemy.vx;
+
+      // Chase player if close
+      const dx = state.player.x - enemy.x;
+      if (Math.abs(dx) < 400 && enemy.vy === 0) {
+        enemy.vx = dx > 0 ? 2 : -2;
+      }
+
+      // X collision — bounce off walls (pipes/bricks that aren't ground level)
+      for (const platform of state.platforms) {
+        if (platform.type === 'pipe' || platform.type === 'brick') {
+          if (rectsOverlap(enemy, platform)) {
+            if (enemy.vx > 0) enemy.x = platform.x - enemy.width;
+            else if (enemy.vx < 0) enemy.x = platform.x + platform.width;
+            enemy.vx = -enemy.vx;
+          }
+        }
+      }
+
+      // Move Y
       enemy.y += enemy.vy;
 
-      // Ground collision
       let onGround = false;
       for (const platform of state.platforms) {
-        if (rectsOverlap(enemy, platform) && enemy.vy > 0) {
+        if (rectsOverlap(enemy, platform) && enemy.vy >= 0) {
           enemy.y = platform.y - enemy.height;
           enemy.vy = 0;
           onGround = true;
@@ -279,41 +290,56 @@ function updateEnemies(state: GameState) {
 
       if (onGround && enemy.jumpTimer <= 0) {
         enemy.vy = -10;
-        enemy.jumpTimer = 60 + Math.random() * 60;
-      }
-
-      // Chase player if close
-      const dx = state.player.x - enemy.x;
-      if (Math.abs(dx) < 400) {
-        enemy.vx = dx > 0 ? 2 : -2;
+        enemy.jumpTimer = 90 + Math.random() * 60;
       }
       continue;
     }
 
-    // Bottle & Rat — ground walkers
+    // === Bottle & Rat — ground walkers (FIXED) ===
+    // Save old X in case we need to revert
+    const oldX = enemy.x;
     enemy.x += enemy.vx;
 
-    let onPlatform = false;
+    // Check for wall collision (pipes, bricks in the way)
+    let bumped = false;
     for (const platform of state.platforms) {
+      if (platform.type === 'pipe' || platform.type === 'brick') {
+        if (rectsOverlap(enemy, platform)) {
+          // Bumped into a wall — revert and reverse direction
+          enemy.x = oldX;
+          enemy.vx = -enemy.vx;
+          bumped = true;
+          break;
+        }
+      }
+    }
+    if (bumped) continue;
+
+    // Edge detection — check if enemy is about to walk off a ground platform
+    let onPlatform = false;
+    let platformEndsSoon = false;
+    for (const platform of state.platforms) {
+      if (platform.type !== 'ground' && platform.type !== 'brick') continue;
+      // Is enemy standing on this platform?
       if (
         enemy.x + enemy.width > platform.x &&
         enemy.x < platform.x + platform.width &&
         Math.abs(enemy.y + enemy.height - platform.y) < 5
       ) {
         onPlatform = true;
-        if (enemy.vx < 0 && enemy.x <= platform.x + 5) {
-          enemy.vx = Math.abs(enemy.vx);
-        } else if (enemy.vx > 0 && enemy.x + enemy.width >= platform.x + platform.width - 5) {
-          enemy.vx = -Math.abs(enemy.vx);
+        // Check edges
+        if (enemy.vx < 0 && enemy.x <= platform.x + 3) {
+          platformEndsSoon = true;
+        } else if (enemy.vx > 0 && enemy.x + enemy.width >= platform.x + platform.width - 3) {
+          platformEndsSoon = true;
         }
       }
-      if (rectsOverlap(enemy, platform) && platform.type === 'pipe') {
-        enemy.vx = -enemy.vx;
-      }
     }
-    if (!onPlatform) {
+
+    if (platformEndsSoon || !onPlatform) {
       enemy.vx = -enemy.vx;
-      enemy.x += enemy.vx * 5;
+      // Nudge back so we don't fall off
+      enemy.x = oldX;
     }
   }
 }
@@ -322,7 +348,6 @@ function updateBoss(state: GameState) {
   const boss = state.boss;
   if (!boss.alive) return;
 
-  // Activate when player enters arena
   if (!boss.active && state.player.x > BOSS_ARENA_LEFT - 100) {
     boss.active = true;
   }
@@ -330,7 +355,6 @@ function updateBoss(state: GameState) {
 
   boss.animTimer++;
 
-  // Movement — patrol between arena bounds
   boss.x += boss.vx;
   if (boss.x < boss.arenaLeft) {
     boss.x = boss.arenaLeft;
@@ -342,7 +366,6 @@ function updateBoss(state: GameState) {
     boss.facingRight = false;
   }
 
-  // Gravity for boss
   boss.vy += GRAVITY;
   boss.y += boss.vy;
   for (const platform of state.platforms) {
@@ -352,7 +375,6 @@ function updateBoss(state: GameState) {
     }
   }
 
-  // Throw documents
   boss.throwTimer -= 1;
   if (boss.throwTimer <= 0) {
     const throwInterval = boss.phase === 1 ? 110 : boss.phase === 2 ? 75 : 45;
@@ -361,7 +383,6 @@ function updateBoss(state: GameState) {
     const dirX = state.player.x - boss.x;
     const dir = dirX > 0 ? 1 : -1;
 
-    // Number of documents grows with phase
     const count = boss.phase;
     for (let i = 0; i < count; i++) {
       state.projectiles.push({
@@ -384,13 +405,11 @@ function updateProjectiles(state: GameState) {
     if (!p.alive) continue;
     p.x += p.vx;
     p.y += p.vy;
-    p.vy += 0.3; // gravity
+    p.vy += 0.3;
     p.rotation += 0.2;
 
-    // Off-screen or hit ground
     if (p.y > GROUND_Y - p.height + 5) {
       p.alive = false;
-      // Puff
       for (let i = 0; i < 6; i++) {
         state.particles.push({
           x: p.x,
@@ -439,7 +458,6 @@ function checkEnemyCollisions(state: GameState) {
   for (const enemy of state.enemies) {
     if (!enemy.alive) continue;
     if (rectsOverlap(state.player, enemy)) {
-      // Mines and crows can't be stomped (crow too high normally, mine explodes anyway)
       const canStomp = enemy.type !== 'mine';
       const isStomping = state.player.vy > 0 &&
         state.player.y + state.player.height - 10 < enemy.y + enemy.height / 2;
@@ -452,7 +470,6 @@ function checkEnemyCollisions(state: GameState) {
         spawnStompParticles(state, enemy);
       } else if (state.player.invulnTimer <= 0) {
         hurtPlayer(state);
-        // Knockback
         state.player.vy = -8;
         state.player.vx = state.player.x < enemy.x ? -5 : 5;
         state.player.y -= 20;
@@ -477,11 +494,9 @@ function checkBossCollision(state: GameState) {
       state.player.jumpsUsed = 1;
       state.score += 500;
 
-      // Speed up boss on damage
       boss.phase = Math.min(3, boss.maxHp - boss.hp + 1);
       boss.vx = boss.vx > 0 ? 2 + boss.phase : -(2 + boss.phase);
 
-      // Explosion
       for (let i = 0; i < 30; i++) {
         state.particles.push({
           x: boss.x + boss.width / 2,
@@ -498,7 +513,6 @@ function checkBossCollision(state: GameState) {
       if (boss.hp <= 0) {
         boss.alive = false;
         state.score += 2000;
-        // Big explosion
         for (let i = 0; i < 60; i++) {
           state.particles.push({
             x: boss.x + boss.width / 2,
